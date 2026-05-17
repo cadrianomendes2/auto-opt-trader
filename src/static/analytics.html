@@ -1,0 +1,683 @@
+.<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📊 Analytics & Previsões</title>
+  <link rel="stylesheet" href="/static/css/dashboard.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <style>
+    /* ── Navbar ── */
+    .navbar {
+      background-color: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 42px;
+    }
+    .nav-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: var(--border-radius);
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: background-color 0.15s, color 0.15s;
+    }
+    .nav-link:hover { background-color: var(--bg-hover); color: var(--text-primary); text-decoration: none; }
+    .nav-link.active { background-color: var(--bg-tertiary); color: var(--text-primary); }
+
+    /* ── Page Layout ── */
+    .page-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .page-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .page-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* ── KPI Cards ── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    .kpi-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      padding: 16px 20px;
+    }
+    .kpi-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+    .kpi-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.1;
+    }
+    .kpi-value.positive { color: var(--color-profit); }
+    .kpi-value.negative { color: var(--color-loss); }
+    .kpi-icon {
+      font-size: 1.2rem;
+      margin-bottom: 4px;
+    }
+
+    /* ── Panel ── */
+    .panel {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      padding: 20px;
+    }
+    .panel-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    /* ── PnL Chart ── */
+    .chart-container-lg { position: relative; height: 260px; }
+
+    /* ── Two col layout ── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    /* ── Forecast ── */
+    .forecast-stat {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.86rem;
+    }
+    .forecast-stat:last-child { border-bottom: none; }
+    .forecast-stat-label { color: var(--text-secondary); }
+    .forecast-stat-value { font-weight: 700; color: var(--text-primary); }
+    .forecast-stat-value.positive { color: var(--color-profit); }
+    .forecast-stat-value.negative { color: var(--color-loss); }
+    .confidence-bar {
+      width: 100%;
+      height: 6px;
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+      margin-top: 12px;
+      overflow: hidden;
+    }
+    .confidence-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--color-paused), var(--color-running));
+      transition: width 0.5s ease;
+    }
+
+    /* ── Agents Table ── */
+    .agents-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+    .agents-table th {
+      text-align: left;
+      padding: 8px 12px;
+      color: var(--text-secondary);
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .agents-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(48,54,61,0.5);
+    }
+    .agents-table tr:last-child td { border-bottom: none; }
+    .agents-table tr:hover td { background: rgba(33,38,45,0.6); }
+    .rank-cell { font-size: 1.1rem; }
+    .wr-badge {
+      display: inline-flex;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .wr-good { background: rgba(63,185,80,0.15); color: var(--color-running); }
+    .wr-ok   { background: rgba(210,153,34,0.15); color: var(--color-paused); }
+    .wr-poor { background: rgba(248,81,73,0.15); color: var(--color-error); }
+    .pnl-pos { color: var(--color-profit); font-weight: 600; }
+    .pnl-neg { color: var(--color-loss);   font-weight: 600; }
+    .status-running { color: var(--color-running); }
+    .status-paused  { color: var(--color-paused); }
+    .status-stopped { color: var(--color-stopped); }
+
+    /* ── Insights ── */
+    .insight-card {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      padding: 14px 16px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .insight-card.warning { border-left: 3px solid var(--color-error); }
+    .insight-card.tip     { border-left: 3px solid var(--color-running); }
+    .insight-card.info    { border-left: 3px solid var(--accent-blue); }
+    .insight-icon { font-size: 1.3rem; flex-shrink: 0; }
+    .insight-body { flex: 1; }
+    .insight-message {
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+    .insight-suggestion {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .insights-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    @media (max-width: 900px) {
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .two-col  { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 500px) {
+      .kpi-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════ HEADER ═══════════ -->
+<header class="header">
+  <div class="header-brand">
+    <span class="logo-icon">📊</span>
+    <span>Analytics & Previsões</span>
+  </div>
+  <div class="header-actions">
+    <div class="ws-status">
+      <span id="wsDot" class="ws-dot disconnected"></span>
+      <span id="wsText">Conectando...</span>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════ NAVBAR ═══════════ -->
+<nav class="navbar">
+  <a href="/" class="nav-link">🏠 Dashboard</a>
+  <a href="/benchmark" class="nav-link">🧪 Benchmark</a>
+  <a href="/analytics" class="nav-link active">📊 Analytics</a>
+</nav>
+
+<!-- ═══════════ MAIN ═══════════ -->
+<main class="page-container">
+
+  <!-- Page Header -->
+  <div>
+    <div class="page-title">📊 Analytics & Previsões</div>
+    <div class="page-subtitle">Visão consolidada da performance, previsões mensais e insights automáticos.</div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon">🔵</div>
+      <div class="kpi-label">Saldo Conta</div>
+      <div class="kpi-value" id="kpiBalance">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">📅</div>
+      <div class="kpi-label">P&L Hoje</div>
+      <div class="kpi-value" id="kpiToday">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">📆</div>
+      <div class="kpi-label">P&L Semana</div>
+      <div class="kpi-value" id="kpiWeek">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">🗓️</div>
+      <div class="kpi-label">P&L Mês</div>
+      <div class="kpi-value" id="kpiMonth">—</div>
+    </div>
+  </div>
+
+  <!-- PnL Timeline Chart -->
+  <div class="panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div class="panel-title" style="margin-bottom:0;">📈 P&L Acumulado</div>
+      <div class="period-filters">
+        <button class="period-btn" id="periodDay"   onclick="changePeriod('day')">Hoje</button>
+        <button class="period-btn" id="periodWeek"  onclick="changePeriod('week')">Semana</button>
+        <button class="period-btn active" id="periodMonth" onclick="changePeriod('month')">Mês</button>
+      </div>
+    </div>
+    <div class="chart-container-lg">
+      <canvas id="timelineChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Forecast + Agents Performance -->
+  <div class="two-col">
+
+    <!-- Forecast -->
+    <div class="panel">
+      <div class="panel-title">🔮 Previsão do Mês</div>
+      <div id="forecastContent">
+        <div class="forecast-stat"><span class="forecast-stat-label">Dias decorridos</span><span class="forecast-stat-value" id="fcDays">—</span></div>
+        <div class="forecast-stat"><span class="forecast-stat-label">P&L acumulado</span><span class="forecast-stat-value positive" id="fcPnl">—</span></div>
+        <div class="forecast-stat"><span class="forecast-stat-label">Média por dia</span><span class="forecast-stat-value positive" id="fcAvg">—</span></div>
+        <div class="forecast-stat"><span class="forecast-stat-label">Projeção do mês</span><span class="forecast-stat-value positive" id="fcProjected">—</span></div>
+        <div class="forecast-stat">
+          <span class="forecast-stat-label">Confiança</span>
+          <span class="forecast-stat-value" id="fcConfidence">—</span>
+        </div>
+        <div class="confidence-bar"><div class="confidence-fill" id="fcConfBar" style="width:0%"></div></div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.72rem;color:var(--text-muted);">
+          <span>Baixa</span><span>Alta</span>
+        </div>
+        <div style="margin-top:14px;padding:10px 12px;background:var(--bg-tertiary);border-radius:6px;font-size:0.8rem;">
+          <span id="fcTrend" style="font-weight:600;">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agents Performance -->
+    <div class="panel">
+      <div class="panel-title">🏆 Performance por Agente</div>
+      <table class="agents-table">
+        <thead>
+          <tr><th></th><th>Agente</th><th>WR</th><th>P&L</th><th>Status</th></tr>
+        </thead>
+        <tbody id="agentsTableBody">
+          <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Insights -->
+  <div class="panel">
+    <div class="panel-title">💡 Sugestões e Insights</div>
+    <div class="insights-list" id="insightsList">
+      <div style="text-align:center;color:var(--text-muted);padding:20px;">Carregando insights...</div>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script type="module">
+import { WSClient } from '/static/js/ws-client.js';
+
+let timelineChart = null;
+let wsClient = null;
+let currentPeriod = 'month';
+
+document.addEventListener('DOMContentLoaded', () => {
+  initChart();
+  loadAll();
+  connectWS();
+
+  // Refresh a cada 60s
+  setInterval(loadAll, 60000);
+});
+
+function connectWS() {
+  const wsUrl = `ws://${window.location.host}/ws`;
+  wsClient = new WSClient(wsUrl);
+  wsClient
+    .on('_connected', () => updateWsStatus(true))
+    .on('_disconnected', () => updateWsStatus(false))
+    .on('agent_update', () => loadAll())
+    .on('trade_closed', () => loadAll())
+    .connect();
+}
+
+function updateWsStatus(connected) {
+  const dot = document.getElementById('wsDot');
+  const text = document.getElementById('wsText');
+  if (dot) dot.className = 'ws-dot ' + (connected ? 'connected' : 'disconnected');
+  if (text) text.textContent = connected ? 'Conectado' : 'Reconectando...';
+}
+
+// Expor changePeriod globalmente para uso no onclick HTML
+window.changePeriod = function(period) {
+  currentPeriod = period;
+  // Atualizar botões ativos
+  ['day', 'week', 'month'].forEach(p => {
+    const btn = document.getElementById('period' + p.charAt(0).toUpperCase() + p.slice(1));
+    if (btn) btn.classList.toggle('active', p === period);
+  });
+  loadTimeline();
+};
+
+async function loadAll() {
+  await Promise.all([
+    loadBalance(),
+    loadSummary(),
+    loadForecast(),
+    loadInsights(),
+    loadTimeline(),
+  ]);
+}
+
+// ── Saldo real da conta ───────────────────────────────────
+async function loadBalance() {
+  try {
+    const resp = await fetch('/api/v1/account/balance');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    const el = document.getElementById('kpiBalance');
+    // Só atualizar se o saldo for > 0 e não houve erro na origem
+    if (el && data.balance > 0 && data.source !== 'error') {
+      el.textContent = `$${parseFloat(data.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      el.className = 'kpi-value';
+      // Marcar como carregado para evitar sobrescrita pelo summary
+      el.dataset.realBalance = '1';
+    }
+  } catch (e) {
+    console.warn('Erro ao carregar saldo real:', e);
+    // Fallback: manter o valor do summary
+  }
+}
+
+// ── Summary ───────────────────────────────────────────────
+async function loadSummary() {
+  try {
+    const resp = await fetch('/api/v1/analytics/summary');
+    const data = await resp.json();
+    renderKPIs(data);
+    renderAgentsTable(data.agents_performance || []);
+  } catch (e) {
+    console.error('Erro ao carregar summary:', e);
+  }
+}
+
+function renderKPIs(data) {
+  // kpiBalance é atualizado por loadBalance(); aqui apenas fallback se ainda não carregou
+  const balEl = document.getElementById('kpiBalance');
+  if (balEl && !balEl.dataset.realBalance) {
+    setKpi('kpiBalance', data.balance, false, '$');
+  }
+  setKpi('kpiToday', data.pnl_today, true, '$');
+  setKpi('kpiWeek', data.pnl_week, true, '$');
+  setKpi('kpiMonth', data.pnl_month, true, '$');
+}
+
+function setKpi(id, value, showSign, prefix = '') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const num = parseFloat(value) || 0;
+  const sign = showSign && num > 0 ? '+' : '';
+  el.textContent = `${sign}${prefix}${Math.abs(num).toFixed(2)}`;
+  if (showSign) {
+    el.className = 'kpi-value ' + (num >= 0 ? 'positive' : 'negative');
+  }
+}
+
+function renderAgentsTable(agents) {
+  const tbody = document.getElementById('agentsTableBody');
+  if (!agents.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">Nenhum agente disponível.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = '';
+  agents.forEach((a) => {
+    const wr = (a.win_rate || 0) * 100;
+    const wrClass = wr >= 57 ? 'wr-good' : wr >= 52 ? 'wr-ok' : 'wr-poor';
+    const pnlClass = (a.pnl || 0) >= 0 ? 'pnl-pos' : 'pnl-neg';
+    const pnlSign = (a.pnl || 0) >= 0 ? '+' : '';
+    const statusIcon = a.status === 'running' ? '🟢' : a.status === 'paused' ? '🟡' : '⚫';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="rank-cell">${a.rank || ''}</td>
+      <td><strong>${escHtml(a.name)}</strong><div style="font-size:.7rem;color:var(--text-secondary);">${a.timeframe_minutes}min · ${escHtml(a.strategy)}</div></td>
+      <td><span class="wr-badge ${wrClass}">${wr.toFixed(1)}%</span></td>
+      <td class="${pnlClass}">${pnlSign}$${Math.abs(a.pnl || 0).toFixed(2)}</td>
+      <td>${statusIcon} <span style="font-size:.75rem;color:var(--text-secondary);">${a.status}</span></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Forecast ──────────────────────────────────────────────
+async function loadForecast() {
+  try {
+    const resp = await fetch('/api/v1/analytics/forecast');
+    const data = await resp.json();
+    renderForecast(data);
+  } catch (e) {
+    console.error('Erro ao carregar forecast:', e);
+  }
+}
+
+function renderForecast(data) {
+  setTextContent('fcDays', data.days_elapsed !== undefined ? `Dia ${data.days_elapsed} de ${data.days_in_month}` : '—');
+  setColoredValue('fcPnl', data.pnl_so_far, '$');
+  setColoredValue('fcAvg', data.avg_per_day, '$');
+  setColoredValue('fcProjected', data.projected_month, '$');
+
+  const conf = (data.confidence || 0) * 100;
+  document.getElementById('fcConfidence').textContent = `${conf.toFixed(0)}%`;
+  document.getElementById('fcConfBar').style.width = `${conf}%`;
+
+  const trendEl = document.getElementById('fcTrend');
+  if (data.trend === 'positive') {
+    trendEl.textContent = '📈 Tendência positiva — continue operando com disciplina.';
+    trendEl.style.color = 'var(--color-running)';
+  } else if (data.trend === 'negative') {
+    trendEl.textContent = '📉 Tendência negativa — revise sua estratégia antes de continuar.';
+    trendEl.style.color = 'var(--color-error)';
+  } else {
+    trendEl.textContent = '➡️ Tendência neutra — monitore de perto a performance.';
+    trendEl.style.color = 'var(--text-secondary)';
+  }
+}
+
+function setColoredValue(id, value, prefix = '') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const num = parseFloat(value) || 0;
+  const sign = num >= 0 ? '+' : '';
+  el.textContent = `${sign}${prefix}${Math.abs(num).toFixed(2)}`;
+  el.className = 'forecast-stat-value ' + (num >= 0 ? 'positive' : 'negative');
+}
+
+function setTextContent(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+// ── Insights ──────────────────────────────────────────────
+async function loadInsights() {
+  try {
+    const resp = await fetch('/api/v1/analytics/insights');
+    const data = await resp.json();
+    renderInsights(data.insights || []);
+  } catch (e) {
+    console.error('Erro ao carregar insights:', e);
+  }
+}
+
+function renderInsights(insights) {
+  const container = document.getElementById('insightsList');
+  if (!insights.length) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">Sem insights disponíveis.</div>';
+    return;
+  }
+  container.innerHTML = '';
+  insights.forEach((ins) => {
+    const card = document.createElement('div');
+    card.className = `insight-card ${ins.type}`;
+    card.innerHTML = `
+      <div class="insight-icon">${ins.icon || '💡'}</div>
+      <div class="insight-body">
+        <div class="insight-message">${escHtml(ins.message)}</div>
+        <div class="insight-suggestion">${escHtml(ins.suggestion || '')}</div>
+      </div>`;
+    container.appendChild(card);
+  });
+}
+
+// ── Timeline Chart ────────────────────────────────────────
+function initChart() {
+  const ctx = document.getElementById('timelineChart').getContext('2d');
+  timelineChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: 'P&L Acumulado',
+        data: [],
+        borderColor: '#58a6ff',
+        backgroundColor: 'rgba(88,166,255,0.08)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          type: 'category',
+          grid: { color: 'rgba(48,54,61,0.5)' },
+          ticks: { color: '#8b949e', maxTicksLimit: 15 },
+        },
+        y: {
+          grid: { color: 'rgba(48,54,61,0.5)' },
+          ticks: { color: '#8b949e', callback: v => '$' + v },
+        },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: items => items[0].label,
+            label: ctx => ` P&L: $${ctx.raw.toFixed(2)}`,
+          },
+        },
+      },
+    },
+  });
+}
+
+async function loadTimeline() {
+  try {
+    const resp = await fetch(`/api/v1/analytics/pnl-timeline?period=${currentPeriod}`);
+    const data = await resp.json();
+    renderTimeline(data.timeline || [], currentPeriod);
+  } catch (e) {
+    console.error('Erro ao carregar timeline:', e);
+  }
+}
+
+function renderTimeline(timeline, period) {
+  if (!timelineChart) return;
+  if (!timeline.length) {
+    timelineChart.data.labels = [];
+    timelineChart.data.datasets[0].data = [];
+    timelineChart.update();
+    return;
+  }
+
+  const labels = timeline.map(t => {
+    if (period === 'day') {
+      // Formato hora: "HH:00"
+      const hour = t.date.slice(11, 13) || '00';
+      return `${hour}:00`;
+    }
+    const d = new Date(t.date + 'T00:00:00');
+    if (period === 'week') {
+      return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+    }
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  });
+  const values = timeline.map(t => t.cumulative_pnl);
+
+  timelineChart.data.labels = labels;
+  timelineChart.data.datasets[0].data = values;
+
+  // Cor dinâmica baseada no último valor
+  const lastVal = values[values.length - 1] || 0;
+  timelineChart.data.datasets[0].borderColor = lastVal >= 0 ? '#3fb950' : '#f85149';
+  timelineChart.data.datasets[0].backgroundColor = lastVal >= 0
+    ? 'rgba(63,185,80,0.08)'
+    : 'rgba(248,81,73,0.08)';
+
+  timelineChart.update();
+}
+
+// ── Helpers ───────────────────────────────────────────────
+function showToast(title, message, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[type] || 'ℹ️'}</span>
+    <div class="toast-content">
+      <div class="toast-title">${escHtml(title)}</div>
+      <div class="toast-message">${escHtml(message)}</div>
+    </div>`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

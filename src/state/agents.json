@@ -1,0 +1,99 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-05-12T09:07:29.390503Z",
+  "agents": [
+    {
+      "id": "r75-5min",
+      "name": "R75 — 5min",
+      "symbol": "R_50",
+      "timeframe_minutes": 5,
+      "stake": 5.0,
+      "strategy": "coin_flip",
+      "strategy_params": {
+        "auto_select": false
+      },
+      "risk": {
+        "daily_loss_limit_pct": 0.1,
+        "daily_win_target_pct": 0.2,
+        "max_consecutive_losses": 5,
+        "risk_per_trade_pct": 0.02
+      },
+      "api_token": "eYf2ydKTUpN2cgz",
+      "status": "error",
+      "enabled": true,
+      "runtime": {
+        "total_trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "total_pnl": 0.0,
+        "consecutive_losses": 0,
+        "last_trade_at": null,
+        "started_at": "2026-05-03T15:31:22.948004Z",
+        "paused_at": null,
+        "error_message": null
+      }
+    },
+    {
+      "id": "agent-9a14f9cd",
+      "name": "BOOM500 · 2min",
+      "symbol": "BOOM500",
+      "timeframe_minutes": 2,
+      "stake": 5.0,
+      "strategy": "coin_flip",
+      "strategy_params": {
+        "auto_select": false
+      },
+      "risk": {
+        "daily_loss_limit_pct": 0.1,
+        "daily_win_target_pct": 0.2,
+        "max_consecutive_losses": 5,
+        "risk_per_trade_pct": 0.02
+      },
+      "api_token": null,
+      "status": "error",
+      "enabled": true,
+      "runtime": {
+        "total_trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "total_pnl": 0.0,
+        "consecutive_losses": 0,
+        "last_trade_at": null,
+        "started_at": "2026-05-03T21:12:42.819643Z",
+        "paused_at": null,
+        "error_message": null
+      }
+    },
+    {
+      "id": "agent-78d31a94",
+      "name": "JD50 · 2min",
+      "symbol": "JD50",
+      "timeframe_minutes": 2,
+      "stake": 5.0,
+      "strategy": "coin_flip",
+      "strategy_params": {
+        "auto_select": false
+      },
+      "risk": {
+        "daily_loss_limit_pct": 0.1,
+        "daily_win_target_pct": 0.2,
+        "max_consecutive_losses": 5,
+        "risk_per_trade_pct": 0.02
+      },
+      "api_token": null,
+      "status": "running",
+      "enabled": true,
+      "runtime": {
+        "total_trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "total_pnl": 0.0,
+        "consecutive_losses": 0,
+        "last_trade_at": null,
+        "started_at": "2026-05-03T21:13:18.276312Z",
+        "paused_at": null,
+        "error_message": null
+      }
+    }
+  ]
+}

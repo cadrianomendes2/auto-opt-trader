@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🧪 Benchmark de Modelos</title>
+  <link rel="stylesheet" href="/static/css/dashboard.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <style>
+    /* ── Navbar ── */
+    .navbar {
+      background-color: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 42px;
+    }
+    .nav-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: var(--border-radius);
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: background-color 0.15s, color 0.15s;
+    }
+    .nav-link:hover { background-color: var(--bg-hover); color: var(--text-primary); text-decoration: none; }
+    .nav-link.active { background-color: var(--bg-tertiary); color: var(--text-primary); }
+
+    /* ── Page Layout ── */
+    .page-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .page-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .page-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* ── TF Tabs ── */
+    .tf-tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .tf-tab {
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border-color);
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      transition: all 0.15s;
+    }
+    .tf-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .tf-tab.active {
+      background: var(--accent-blue);
+      border-color: var(--accent-blue);
+      color: #0d1117;
+    }
+
+    /* ── Panel ── */
+    .panel {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      padding: 20px;
+    }
+    .panel-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* ── Benchmark Table ── */
+    .bench-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+    }
+    .bench-table th {
+      text-align: left;
+      padding: 10px 14px;
+      color: var(--text-secondary);
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border-color);
+      white-space: nowrap;
+    }
+    .bench-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(48,54,61,0.5);
+      color: var(--text-primary);
+    }
+    .bench-table tr:last-child td { border-bottom: none; }
+    .bench-table tr:hover td { background: rgba(33,38,45,0.6); }
+    .model-name-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .model-rank {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--bg-tertiary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+    .wr-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+    .wr-good { background: rgba(63,185,80,0.15); color: var(--color-running); }
+    .wr-ok   { background: rgba(210,153,34,0.15); color: var(--color-paused); }
+    .wr-poor { background: rgba(248,81,73,0.15);  color: var(--color-error); }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 8px;
+      border-radius: 8px;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+    .status-good { background: rgba(63,185,80,0.1); color: var(--color-running); }
+    .status-ok   { background: rgba(210,153,34,0.1); color: var(--color-paused); }
+    .status-poor { background: rgba(248,81,73,0.1);  color: var(--color-error); }
+    .pnl-pos { color: var(--color-profit); font-weight: 600; }
+    .pnl-neg { color: var(--color-loss);   font-weight: 600; }
+    .data-source-badge {
+      font-size: 0.68rem;
+      padding: 1px 6px;
+      border-radius: 8px;
+      background: rgba(88,166,255,0.1);
+      color: var(--accent-blue);
+    }
+
+    /* ── Charts Grid ── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .chart-container-sm {
+      position: relative;
+      height: 220px;
+    }
+
+    /* ── Simulation ── */
+    .sim-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .sim-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    .sim-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--color-stopped);
+    }
+    .sim-dot.running {
+      background: var(--color-running);
+      box-shadow: 0 0 6px var(--color-running);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .sim-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+    .sim-table th {
+      text-align: left;
+      padding: 8px 12px;
+      color: var(--text-secondary);
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .sim-table td {
+      padding: 9px 12px;
+      border-bottom: 1px solid rgba(48,54,61,0.4);
+    }
+    .sim-table tr:last-child td { border-bottom: none; }
+    .sim-new-row {
+      animation: rowIn 0.4s ease;
+    }
+    @keyframes rowIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .signal-call { color: var(--color-profit); font-weight: 700; }
+    .signal-put  { color: var(--color-error);  font-weight: 700; }
+    .signal-wait { color: var(--text-muted); }
+    .result-win  { color: var(--color-profit); font-weight: 600; }
+    .result-loss { color: var(--color-error);  font-weight: 600; }
+    .result-pending { color: var(--color-paused); }
+
+    /* ── Loading ── */
+    .loading-row td { color: var(--text-muted); font-style: italic; text-align: center; padding: 20px; }
+
+    @media (max-width: 768px) {
+      .charts-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════ HEADER ═══════════ -->
+<header class="header">
+  <div class="header-brand">
+    <span class="logo-icon">🧪</span>
+    <span>Benchmark de Modelos</span>
+  </div>
+  <div class="header-actions">
+    <div class="ws-status">
+      <span id="wsDot" class="ws-dot disconnected"></span>
+      <span id="wsText">Conectando...</span>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════ NAVBAR ═══════════ -->
+<nav class="navbar">
+  <a href="/" class="nav-link">🏠 Dashboard</a>
+  <a href="/benchmark" class="nav-link active">🧪 Benchmark</a>
+  <a href="/analytics" class="nav-link">📊 Analytics</a>
+</nav>
+
+<!-- ═══════════ MAIN ═══════════ -->
+<main class="page-container">
+
+  <!-- Page Header -->
+  <div>
+    <div class="page-title">🧪 Benchmark de Modelos</div>
+    <div class="page-subtitle">Comparação de performance das estratégias por timeframe. Dados reais quando disponíveis, teóricos como fallback.</div>
+  </div>
+
+  <!-- Timeframe Selector -->
+  <div class="panel" style="padding: 16px 20px;">
+    <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:10px;">
+      Selecionar Timeframe
+    </div>
+    <div class="tf-tabs" id="tfTabs">
+      <button class="tf-tab" data-tf="2">2m</button>
+      <button class="tf-tab active" data-tf="5">5m</button>
+      <button class="tf-tab" data-tf="10">10m</button>
+      <button class="tf-tab" data-tf="15">15m</button>
+      <button class="tf-tab" data-tf="30">30m</button>
+    </div>
+  </div>
+
+  <!-- Comparative Table -->
+  <div class="panel">
+    <div class="panel-title">📊 Tabela Comparativa de Modelos</div>
+    <div style="overflow-x:auto;">
+      <table class="bench-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Modelo</th>
+            <th>Win Rate</th>
+            <th>Trades</th>
+            <th>Wins</th>
+            <th>Losses</th>
+            <th>P&L</th>
+            <th>Status</th>
+            <th>Fonte</th>
+          </tr>
+        </thead>
+        <tbody id="benchTableBody">
+          <tr class="loading-row"><td colspan="9">Carregando dados...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-grid">
+    <div class="panel">
+      <div class="panel-title">📊 Win Rate por Modelo</div>
+      <div class="chart-container-sm">
+        <canvas id="wrChart"></canvas>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">💰 P&L Estimado por Modelo</div>
+      <div class="chart-container-sm">
+        <canvas id="pnlBarChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Symbol Rankings by EV -->
+  <div class="panel" id="symbolRankingsPanel">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div class="panel-title" style="margin:0;">🎯 Melhores Símbolos por EV Score</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:0.78rem;color:var(--text-secondary);">Timeframe:</span>
+        <select id="symbolRankTf" style="background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:6px;padding:4px 10px;font-size:0.82rem;">
+          <option value="2">2 min</option>
+          <option value="5" selected>5 min</option>
+          <option value="10">10 min</option>
+          <option value="15">15 min</option>
+          <option value="30">30 min</option>
+        </select>
+        <button class="btn btn-primary btn-sm" id="btnLoadSymbolRanks" onclick="loadSymbolRankings()">🔄 Atualizar</button>
+      </div>
+    </div>
+    <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:14px;line-height:1.5;">
+      Score = win_rate_estimado × payout_líquido − (1 − win_rate_estimado). Análise dos últimos 200 candles por símbolo.
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="sym-rank-table">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Símbolo</th>
+            <th>Nome</th>
+            <th>EV Score</th>
+            <th>Win Rate Est.</th>
+            <th>Volatilidade</th>
+            <th>Tendência</th>
+            <th>Freq. Sinais</th>
+          </tr>
+        </thead>
+        <tbody id="symbolRankTableBody">
+          <tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted);">
+            Clique em "Atualizar" para calcular os scores (pode demorar ~30s).
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Real-time Simulation -->
+  <div class="panel">
+    <div class="sim-header">
+      <div class="panel-title" style="margin:0;">⚡ Simulação em Tempo Real</div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="sim-status">
+          <div class="sim-dot" id="simDot"></div>
+          <span id="simStatus">Parado</span>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btnSimToggle">▶ Iniciar Simulação</button>
+      </div>
+    </div>
+    <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:14px;line-height:1.5;">
+      Cada modelo executa o gerador de sinais em tempo real. Os sinais são comparados com o resultado esperado após o timeframe.
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="sim-table">
+        <thead>
+          <tr>
+            <th>Hora</th><th>Modelo</th><th>Sinal</th><th>Win Rate</th><th>Resultado</th><th>Acerto?</th>
+          </tr>
+        </thead>
+        <tbody id="simTableBody">
+          <tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);">
+            Inicie a simulação para ver os sinais ao vivo.
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script type="module">
+import { WSClient } from '/static/js/ws-client.js';
+
+// ── Estado ────────────────────────────────────────────────
+let currentTf = 5;
+let wrChart = null;
+let pnlBarChart = null;
+let simRunning = false;
+let simEventSource = null;
+let wsClient = null;
+
+// ── Init ─────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  initCharts();
+  loadBenchmarkData(currentTf);
+  bindTfTabs();
+  bindSimButton();
+  connectWS();
+});
+
+// ── Symbol Rankings ───────────────────────────────────────
+window.loadSymbolRankings = async function() {
+  const tf = parseInt(document.getElementById('symbolRankTf')?.value || '5');
+  const tbody = document.getElementById('symbolRankTableBody');
+  const btn = document.getElementById('btnLoadSymbolRanks');
+  if (!tbody) return;
+
+  tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted);">
+    ⏳ Calculando scores... (pode demorar ~30s para 6 símbolos)
+  </td></tr>`;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Calculando...'; }
+
+  try {
+    const resp = await fetch(`/api/v1/symbols/ranked?duration_minutes=${tf}&limit=10`);
+    if (!resp.ok) throw new Error(await resp.text());
+    const data = await resp.json();
+
+    const rankings = data.rankings || [];
+    if (!rankings.length) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted);">Sem dados disponíveis.</td></tr>`;
+      return;
+    }
+
+    const medals = ['🥇','🥈','🥉'];
+    tbody.innerHTML = '';
+    rankings.forEach((r, i) => {
+      const ev = r.ev_pct !== undefined ? r.ev_pct : (r.score * 100);
+      const evClass = ev >= 8 ? 'ev-pos' : ev >= 0 ? 'ev-neu' : 'ev-neg';
+      const evSign = ev >= 0 ? '+' : '';
+      const rankLabel = medals[i] || `#${i+1}`;
+
+      // Barras de progresso
+      const volWidth = Math.round((r.volatility_score || 0) * 60);
+      const trendWidth = Math.round((r.trend_strength || 0) * 60);
+      const freqWidth = Math.round((r.signal_frequency || 0) * 60);
+      const wrWidth = Math.round(((r.win_rate_estimate || 0.5) - 0.4) * 200);
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><span style="font-size:1.1rem;">${rankLabel}</span></td>
+        <td><span class="sym-badge">${escHtml(r.symbol)}</span></td>
+        <td style="color:var(--text-secondary);font-size:0.8rem;">${escHtml(r.display_name || r.symbol)}</td>
+        <td><span class="ev-badge ${evClass}">${evSign}${ev.toFixed(2)}%</span></td>
+        <td>
+          <div class="pct-bar-wrap">
+            <div class="pct-bar" style="width:${Math.max(4,wrWidth)}px;background:var(--color-running)"></div>
+            <span class="pct-label">${(r.win_rate_pct || ((r.win_rate_estimate||0.5)*100)).toFixed(1)}%</span>
+          </div>
+        </td>
+        <td>
+          <div class="pct-bar-wrap">
+            <div class="pct-bar" style="width:${Math.max(4,volWidth)}px;background:var(--accent-blue)"></div>
+            <span class="pct-label">${(r.volatility_pct || ((r.volatility_score||0)*100)).toFixed(0)}%</span>
+          </div>
+        </td>
+        <td>
+          <div class="pct-bar-wrap">
+            <div class="pct-bar" style="width:${Math.max(4,trendWidth)}px;background:var(--accent-purple)"></div>
+            <span class="pct-label">${(r.trend_pct || ((r.trend_strength||0)*100)).toFixed(0)}%</span>
+          </div>
+        </td>
+        <td>
+          <div class="pct-bar-wrap">
+            <div class="pct-bar" style="width:${Math.max(4,freqWidth)}px;background:var(--color-paused)"></div>
+            <span class="pct-label">${(r.signal_freq_pct || ((r.signal_frequency||0)*100)).toFixed(0)}%</span>
+          </div>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+
+    showToast('🎯 Rankings Carregados', `${rankings.length} símbolos avaliados para ${tf}min`, 'success');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--color-error);">
+      Erro ao carregar rankings: ${escHtml(e.message)}
+    </td></tr>`;
+    showToast('❌ Erro', `Falha ao carregar rankings: ${e.message}`, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Atualizar'; }
+  }
+};
+
+function connectWS() {
+  const wsUrl = `ws://${window.location.host}/ws`;
+  wsClient = new WSClient(wsUrl);
+  wsClient
+    .on('_connected', () => updateWsStatus(true))
+    .on('_disconnected', () => updateWsStatus(false))
+    .connect();
+}
+
+function updateWsStatus(connected) {
+  const dot = document.getElementById('wsDot');
+  const text = document.getElementById('wsText');
+  if (dot) dot.className = 'ws-dot ' + (connected ? 'connected' : 'disconnected');
+  if (text) text.textContent = connected ? 'Conectado' : 'Reconectando...';
+}
+
+// ── Timeframe Tabs ────────────────────────────────────────
+function bindTfTabs() {
+  document.getElementById('tfTabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('.tf-tab');
+    if (!btn) return;
+    document.querySelectorAll('.tf-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTf = parseInt(btn.dataset.tf);
+    loadBenchmarkData(currentTf);
+  });
+}
+
+// ── Benchmark Data ────────────────────────────────────────
+async function loadBenchmarkData(tf) {
+  const tbody = document.getElementById('benchTableBody');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="9">Carregando dados...</td></tr>';
+
+  try {
+    const resp = await fetch(`/api/v1/benchmark/results?duration_minutes=${tf}`);
+    const data = await resp.json();
+    renderBenchTable(data.strategies || []);
+    updateCharts(data.strategies || []);
+  } catch (e) {
+    tbody.innerHTML = `<tr class="loading-row"><td colspan="9">Erro ao carregar dados: ${e.message}</td></tr>`;
+    showToast('Erro', 'Falha ao carregar benchmark.', 'error');
+  }
+}
+
+function renderBenchTable(strategies) {
+  const tbody = document.getElementById('benchTableBody');
+  if (!strategies.length) {
+    tbody.innerHTML = '<tr class="loading-row"><td colspan="9">Sem dados disponíveis.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  strategies.forEach((s, i) => {
+    const wrClass = s.status === 'good' ? 'wr-good' : s.status === 'ok' ? 'wr-ok' : 'wr-poor';
+    const statusClass = s.status === 'good' ? 'status-good' : s.status === 'ok' ? 'status-ok' : 'status-poor';
+    const statusLabel = s.status === 'good' ? '✅ BOM' : s.status === 'ok' ? '⚠️ OK' : '❌ MAU';
+    const pnlClass = s.pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+    const pnlSign = s.pnl >= 0 ? '+' : '';
+    const ranks = ['🥇','🥈','🥉','4','5'];
+    const rankLabel = ranks[i] || (i+1);
+    const sourceLabel = s.data_source === 'real' ? 'Real' : 'Teórico';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="model-rank">${rankLabel}</span></td>
+      <td><div class="model-name-cell"><strong>${escHtml(s.label)}</strong></div></td>
+      <td><span class="wr-badge ${wrClass}">${(s.win_rate*100).toFixed(1)}%</span></td>
+      <td>${s.total_trades}</td>
+      <td style="color:var(--color-profit)">${s.wins}</td>
+      <td style="color:var(--color-error)">${s.losses}</td>
+      <td class="${pnlClass}">${pnlSign}$${Math.abs(s.pnl).toFixed(2)}</td>
+      <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+      <td><span class="data-source-badge">${sourceLabel}</span></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Charts ────────────────────────────────────────────────
+function initCharts() {
+  const commonOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+  };
+
+  // Win Rate Bar Chart
+  wrChart = new Chart(document.getElementById('wrChart'), {
+    type: 'bar',
+    data: { labels: [], datasets: [{
+      data: [],
+      backgroundColor: [],
+      borderRadius: 6,
+      borderSkipped: false,
+    }]},
+    options: {
+      ...commonOptions,
+      scales: {
+        y: {
+          min: 40, max: 75,
+          grid: { color: 'rgba(48,54,61,0.5)' },
+          ticks: { color: '#8b949e', callback: v => v + '%' },
+        },
+        x: { grid: { display: false }, ticks: { color: '#8b949e' } },
+      },
+      plugins: {
+        ...commonOptions.plugins,
+        tooltip: { callbacks: { label: ctx => ` ${ctx.raw.toFixed(1)}%` } },
+      },
+    },
+  });
+
+  // P&L Bar Chart
+  pnlBarChart = new Chart(document.getElementById('pnlBarChart'), {
+    type: 'bar',
+    data: { labels: [], datasets: [{
+      data: [],
+      backgroundColor: [],
+      borderRadius: 6,
+      borderSkipped: false,
+    }]},
+    options: {
+      ...commonOptions,
+      scales: {
+        y: {
+          grid: { color: 'rgba(48,54,61,0.5)' },
+          ticks: { color: '#8b949e', callback: v => '$' + v },
+        },
+        x: { grid: { display: false }, ticks: { color: '#8b949e' } },
+      },
+      plugins: {
+        ...commonOptions.plugins,
+        tooltip: { callbacks: { label: ctx => ` $${ctx.raw.toFixed(2)}` } },
+      },
+    },
+  });
+}
+
+function updateCharts(strategies) {
+  if (!strategies.length) return;
+
+  const labels = strategies.map(s => s.label);
+  const wrs = strategies.map(s => s.win_rate * 100);
+  const pnls = strategies.map(s => s.pnl);
+
+  const wrColors = strategies.map(s =>
+    s.status === 'good' ? 'rgba(63,185,80,0.7)' :
+    s.status === 'ok'   ? 'rgba(210,153,34,0.7)' :
+                          'rgba(248,81,73,0.7)'
+  );
+  const pnlColors = pnls.map(p => p >= 0 ? 'rgba(63,185,80,0.7)' : 'rgba(248,81,73,0.7)');
+
+  wrChart.data.labels = labels;
+  wrChart.data.datasets[0].data = wrs;
+  wrChart.data.datasets[0].backgroundColor = wrColors;
+  wrChart.update();
+
+  pnlBarChart.data.labels = labels;
+  pnlBarChart.data.datasets[0].data = pnls;
+  pnlBarChart.data.datasets[0].backgroundColor = pnlColors;
+  pnlBarChart.update();
+}
+
+// ── Simulation ────────────────────────────────────────────
+function bindSimButton() {
+  document.getElementById('btnSimToggle').addEventListener('click', () => {
+    if (simRunning) stopSimulation();
+    else startSimulation();
+  });
+}
+
+function startSimulation() {
+  simRunning = true;
+  document.getElementById('simDot').classList.add('running');
+  document.getElementById('simStatus').textContent = 'Rodando';
+  document.getElementById('btnSimToggle').textContent = '⏹ Parar';
+
+  const url = `/api/v1/benchmark/realtime-signals?symbol=R_75&duration_minutes=${currentTf}`;
+  simEventSource = new EventSource(url);
+
+  simEventSource.onmessage = (e) => {
+    try {
+      const signal = JSON.parse(e.data);
+      prependSimRow(signal);
+    } catch (err) {
+      console.warn('Erro ao parsear sinal:', err);
+    }
+  };
+
+  simEventSource.onerror = () => {
+    showToast('Simulação', 'Conexão SSE interrompida.', 'warning');
+    stopSimulation();
+  };
+}
+
+function stopSimulation() {
+  simRunning = false;
+  if (simEventSource) { simEventSource.close(); simEventSource = null; }
+  document.getElementById('simDot').classList.remove('running');
+  document.getElementById('simStatus').textContent = 'Parado';
+  document.getElementById('btnSimToggle').textContent = '▶ Iniciar Simulação';
+}
+
+function prependSimRow(signal) {
+  const tbody = document.getElementById('simTableBody');
+
+  // Remover placeholder
+  const placeholder = tbody.querySelector('td[colspan]');
+  if (placeholder) tbody.innerHTML = '';
+
+  const signalClass = signal.signal === 'call' ? 'signal-call' :
+                      signal.signal === 'put'  ? 'signal-put' : 'signal-wait';
+  const signalLabel = signal.signal === 'call' ? '▲ CALL' :
+                      signal.signal === 'put'  ? '▼ PUT'  : '— WAIT';
+
+  // Simular resultado baseado no win rate
+  let result = '⏳ Aguardando';
+  let resultClass = 'result-pending';
+  let acerto = '—';
+
+  if (signal.signal !== 'wait') {
+    const isWin = Math.random() < signal.win_rate;
+    result = isWin ? 'WIN' : 'LOSS';
+    resultClass = isWin ? 'result-win' : 'result-loss';
+    acerto = isWin ? '✅' : '❌';
+  }
+
+  const time = new Date(signal.timestamp).toLocaleTimeString('pt-BR');
+  const tr = document.createElement('tr');
+  tr.className = 'sim-new-row';
+  tr.innerHTML = `
+    <td class="text-secondary text-sm">${time}</td>
+    <td><strong>${escHtml(signal.label || signal.model)}</strong></td>
+    <td class="${signalClass}">${signalLabel}</td>
+    <td>${(signal.win_rate * 100).toFixed(1)}%</td>
+    <td class="${resultClass}">${result}</td>
+    <td style="font-size:1rem;">${acerto}</td>`;
+
+  tbody.insertBefore(tr, tbody.firstChild);
+
+  // Limitar a 20 linhas
+  while (tbody.children.length > 20) tbody.removeChild(tbody.lastChild);
+}
+
+// ── Toast ─────────────────────────────────────────────────
+function showToast(title, message, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[type] || 'ℹ️'}</span>
+    <div class="toast-content">
+      <div class="toast-title">${escHtml(title)}</div>
+      <div class="toast-message">${escHtml(message)}</div>
+    </div>`;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(() => toast.remove(), 300); }, 4000);
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

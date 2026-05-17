@@ -1,0 +1,2093 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🤖 Binary Bot Dashboard</title>
+  <link rel="stylesheet" href="/static/css/dashboard.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <style>
+    /* ══════════════════════════════════════════
+       LAYOUT RAIZ — conteúdo + sidebar direita
+       ══════════════════════════════════════════ */
+    .app-root {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar Direita Dev ── */
+    .left-dev-sidebar {
+      width: 300px;
+      min-width: 300px;
+      background: var(--bg-secondary);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      transition: width 0.25s cubic-bezier(.4,0,.2,1), min-width 0.25s;
+      position: relative;
+      z-index: 50;
+      overflow: hidden;
+      order: 2;
+    }
+    .left-dev-sidebar.collapsed {
+      width: 0;
+      min-width: 0;
+    }
+
+    /* Botão toggle da sidebar */
+    .left-dev-toggle {
+      position: fixed;
+      right: 300px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 52px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-right: none;
+      border-radius: 6px 0 0 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 51;
+      transition: right 0.25s cubic-bezier(.4,0,.2,1), background 0.15s;
+      color: var(--text-muted);
+      font-size: 0.65rem;
+    }
+    .left-dev-toggle:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+    .left-dev-sidebar.collapsed ~ .left-dev-toggle,
+    .left-dev-toggle.collapsed {
+      right: 0;
+    }
+
+    /* Header da sidebar */
+    .left-dev-header {
+      display: flex;
+      align-items: center;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-tertiary);
+      flex-shrink: 0;
+      gap: 8px;
+    }
+    .left-dev-header-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      flex: 1;
+      white-space: nowrap;
+    }
+    .left-dev-badge {
+      background: rgba(248,81,73,0.15);
+      color: #f85149;
+      border: 1px solid rgba(248,81,73,0.3);
+      border-radius: 8px;
+      font-size: 0.62rem;
+      font-weight: 700;
+      padding: 1px 5px;
+    }
+
+    /* Tabs da sidebar */
+    .left-dev-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-color);
+      flex-shrink: 0;
+      background: var(--bg-secondary);
+    }
+    .left-dev-tab {
+      flex: 1;
+      padding: 7px 4px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-align: center;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .left-dev-tab.active {
+      color: var(--accent-blue);
+      border-bottom-color: var(--accent-blue);
+    }
+    .left-dev-tab:hover:not(.active) {
+      color: var(--text-primary);
+      background: var(--bg-hover);
+    }
+
+    /* Panes da sidebar */
+    .left-dev-pane {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .left-dev-pane.hidden { display: none; }
+
+    /* ── Bot Diagnostics ── */
+    .bot-diag-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px 4px;
+      gap: 6px;
+    }
+    .bot-diag-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .bot-diag-ts {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+    }
+    .bot-diag-divider {
+      height: 1px;
+      background: var(--border-color);
+      margin: 8px 0 4px;
+    }
+    .bot-diag-item {
+      margin: 4px 8px;
+      border-radius: 6px;
+      padding: 8px 10px;
+      border-left: 3px solid #484f58;
+      background: var(--bg-tertiary);
+    }
+    .bot-diag-item.prio-high { border-left-color: #f85149; background: rgba(248,81,73,0.05); }
+    .bot-diag-item.prio-medium { border-left-color: #e3b341; background: rgba(227,179,65,0.05); }
+    .bot-diag-item.prio-low { border-left-color: #3fb950; background: rgba(63,185,80,0.05); }
+    .bot-diag-item-top {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 3px;
+    }
+    .bot-diag-badge {
+      font-size: 0.58rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .bot-diag-badge.high   { background: rgba(248,81,73,0.2);  color: #f85149; }
+    .bot-diag-badge.medium { background: rgba(227,179,65,0.2); color: #e3b341; }
+    .bot-diag-badge.low    { background: rgba(63,185,80,0.2);  color: #3fb950; }
+    .bot-diag-item-title {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      flex: 1;
+    }
+    .bot-diag-item-desc {
+      font-size: 0.66rem;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    /* ── Área Principal (direita) ── */
+    .main-content {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Navbar ── */
+    .navbar {
+      background-color: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 42px;
+    }
+    .nav-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: var(--border-radius);
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: background-color 0.15s, color 0.15s;
+    }
+    .nav-link:hover { background-color: var(--bg-hover); color: var(--text-primary); text-decoration: none; }
+    .nav-link.active { background-color: var(--bg-tertiary); color: var(--text-primary); }
+
+    /* ── PANIC Button ── */
+    .btn-panic {
+      margin-left: auto;
+      background: #f85149;
+      color: white;
+      font-weight: 700;
+      padding: 5px 16px;
+      border-radius: 6px;
+      border: 2px solid #ff6b6b;
+      cursor: pointer;
+      font-size: 0.82rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      animation: pulse-red 2s infinite;
+      transition: transform 0.1s, opacity 0.15s;
+    }
+    .btn-panic:hover { opacity: 0.9; transform: scale(1.04); }
+    .btn-panic:active { transform: scale(0.97); }
+    @keyframes pulse-red {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(248, 81, 73, 0.5); }
+      50%       { box-shadow: 0 0 0 6px rgba(248, 81, 73, 0); }
+    }
+
+    /* ── Overview Cards ── */
+    .overview-bar {
+      display: flex;
+      gap: 12px;
+      padding: 16px 24px 0;
+      flex-wrap: wrap;
+    }
+    .overview-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 140px;
+      flex: 1;
+    }
+    .overview-card-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .overview-card-info {}
+    .overview-card-label {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+    .overview-card-value {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-top: 1px;
+    }
+
+    /* ── Dashboard Layout ── */
+    .dashboard-full {
+      padding: 16px 24px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ══════════════════════════════════════════
+       TRADES TIMELINE — substituindo P&L chart
+       ══════════════════════════════════════════ */
+    .trades-timeline-panel {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      overflow: hidden;
+    }
+    .trades-timeline-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-tertiary);
+    }
+    .trades-timeline-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      flex: 1;
+    }
+    .trades-timeline-legend {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+    }
+    .tl-legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+    .tl-legend-dot.win   { background: #3fb950; }
+    .tl-legend-dot.loss  { background: #f85149; }
+    .tl-legend-dot.pending { background: rgba(88,166,255,0.3); border: 1px solid #58a6ff; }
+
+    /* Faixa de cards rolável */
+    .trades-timeline-track {
+      display: flex;
+      flex-direction: row;
+      gap: 8px;
+      padding: 12px 18px;
+      overflow-x: auto;
+      min-height: 120px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-color) transparent;
+      align-items: center;
+    }
+    .trades-timeline-track::-webkit-scrollbar { height: 5px; }
+    .trades-timeline-track::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+
+    .trades-timeline-empty {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      text-align: center;
+      width: 100%;
+      padding: 20px 0;
+    }
+
+    /* Card de trade na timeline */
+    .tl-card {
+      min-width: 88px;
+      max-width: 88px;
+      border-radius: 8px;
+      border: 2px solid transparent;
+      padding: 8px 8px 7px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: default;
+      position: relative;
+      transition: transform 0.15s, box-shadow 0.15s;
+      flex-shrink: 0;
+      background: var(--bg-tertiary);
+      overflow: visible;
+    }
+    .tl-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+      z-index: 10;
+    }
+
+    /* Estados dos cards */
+    .tl-card.win {
+      border-color: #3fb950;
+      background: rgba(63,185,80,0.07);
+    }
+    .tl-card.loss {
+      border-color: #f85149;
+      background: rgba(248,81,73,0.07);
+    }
+    .tl-card.pending {
+      border-color: #58a6ff;
+      background: rgba(88,166,255,0.06);
+      animation: tl-pending-pulse 2s ease-in-out infinite;
+    }
+    @keyframes tl-pending-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(88,166,255,0.3); }
+      50%       { box-shadow: 0 0 0 5px rgba(88,166,255,0); }
+    }
+
+    /* Ícone de direção */
+    .tl-card-dir {
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+    .tl-card-dir.call { color: #3fb950; }
+    .tl-card-dir.put  { color: #f85149; }
+    .tl-card-dir.pending { color: #58a6ff; }
+
+    /* Nome do agente */
+    .tl-card-agent {
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-align: center;
+      max-width: 80px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Hora */
+    .tl-card-time {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Countdown / resultado */
+    .tl-card-result {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-align: center;
+    }
+    .tl-card-result.win   { color: #3fb950; }
+    .tl-card-result.loss  { color: #f85149; }
+    .tl-card-result.countdown {
+      color: #58a6ff;
+      font-variant-numeric: tabular-nums;
+      font-size: 0.8rem;
+    }
+    .tl-card-result.countdown.urgent { color: #f85149; }
+
+    /* Stake badge */
+    .tl-card-stake {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+    }
+
+    /* Tooltip ao hover */
+    .tl-card-tooltip {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #161b22;
+      border: 1px solid var(--border-color);
+      border-radius: 7px;
+      padding: 9px 12px;
+      min-width: 180px;
+      max-width: 220px;
+      z-index: 999;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      font-size: 0.72rem;
+      line-height: 1.7;
+      pointer-events: none;
+      color: var(--text-secondary);
+    }
+    .tl-card:hover .tl-card-tooltip { display: block; }
+    .tl-card-tooltip strong { color: var(--text-primary); }
+
+    /* ══════════════════════════════════════════
+       PAINEL DE GRÁFICOS AUXILIARES
+       ══════════════════════════════════════════ */
+    .charts-aux-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) {
+      .charts-aux-row { grid-template-columns: 1fr; }
+    }
+
+    .aux-chart-panel {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      overflow: hidden;
+    }
+    .aux-chart-header {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-tertiary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .aux-chart-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      flex: 1;
+    }
+    .aux-chart-subtitle {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+    }
+    .aux-chart-body {
+      padding: 16px;
+      position: relative;
+      height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Donut center stats */
+    .donut-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      pointer-events: none;
+    }
+    .donut-center-pct {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      line-height: 1;
+    }
+    .donut-center-label {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 2px;
+    }
+
+    /* P&L line chart panel */
+    .pnl-chart-panel {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      overflow: hidden;
+    }
+    .pnl-chart-header {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-tertiary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .pnl-chart-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      flex: 1;
+    }
+    .pnl-chart-body {
+      padding: 16px;
+      height: 220px;
+      position: relative;
+    }
+
+    /* ── Agents Grid ── */
+    .agents-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+
+    /* ── Add Agent Card ── */
+    .agent-card-add {
+      background-color: var(--bg-secondary);
+      border: 2px dashed var(--border-color);
+      border-radius: var(--border-radius);
+      min-height: 140px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: border-color 0.2s, background-color 0.2s;
+      color: var(--text-muted);
+    }
+    .agent-card-add:hover {
+      border-color: var(--accent-blue);
+      background-color: rgba(88, 166, 255, 0.04);
+      color: var(--accent-blue);
+    }
+    .agent-card-add-icon { font-size: 1.8rem; }
+    .agent-card-add-label { font-size: 0.85rem; font-weight: 600; }
+
+    /* ── Hover-only card actions ── */
+    .agent-card .card-actions-hover .btn-edit,
+    .agent-card .card-actions-hover .btn-delete {
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      pointer-events: none;
+    }
+    .agent-card:hover .card-actions-hover .btn-edit,
+    .agent-card:hover .card-actions-hover .btn-delete {
+      opacity: 1;
+      pointer-events: all;
+    }
+    .agent-card .card-actions-hover .btn-pause { opacity: 1; }
+
+    /* ── Strategy Selector ── */
+    .strategy-section {
+      border-top: 1px solid var(--border-color);
+      padding-top: 10px;
+      margin-top: 10px;
+    }
+    .strategy-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .strategy-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+    }
+    .strategy-toggle { display: flex; gap: 4px; }
+    .toggle-btn {
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border-color);
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      transition: all 0.15s;
+    }
+    .toggle-btn.active-auto {
+      background: rgba(63,185,80,0.15);
+      color: var(--color-running);
+      border-color: var(--color-running);
+    }
+    .toggle-btn.active-manual {
+      background: rgba(88,166,255,0.15);
+      color: var(--accent-blue);
+      border-color: var(--accent-blue);
+    }
+    .strategy-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+    .strategy-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background-color 0.15s;
+      font-size: 0.78rem;
+    }
+    .strategy-option:hover { background-color: var(--bg-hover); }
+    .strategy-option.selected {
+      border-color: var(--accent-blue);
+      background: rgba(88,166,255,0.08);
+    }
+    .strategy-option-left { display: flex; align-items: center; gap: 6px; }
+    .strategy-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .strategy-name { font-weight: 500; }
+    .strategy-wr {
+      font-size: 0.7rem;
+      padding: 1px 6px;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+    .wr-good { background: rgba(63,185,80,0.15); color: var(--color-running); }
+    .wr-ok   { background: rgba(210,153,34,0.15); color: var(--color-paused); }
+    .wr-poor { background: rgba(248,81,73,0.15); color: var(--color-error); }
+    .dot-good { background: var(--color-running); }
+    .dot-ok   { background: var(--color-paused); }
+    .dot-poor { background: var(--color-error); }
+    .strategy-loading {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      padding: 6px 0;
+      text-align: center;
+    }
+
+    /* ── Trade em curso ── */
+    .trade-row-pending { background: transparent !important; opacity: 0.9; }
+    .trade-row-pending td { color: var(--text-secondary); }
+    .trade-pending-pulse {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--accent-blue, #58a6ff);
+      vertical-align: middle;
+      margin-right: 4px;
+      animation: pulse-trade 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse-trade {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.7); }
+    }
+    .result-pending {
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      font-style: italic;
+    }
+
+    /* ── Countdown na tabela ── */
+    .table-trade-countdown {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+      letter-spacing: 0.03em;
+      font-variant-numeric: tabular-nums;
+    }
+    .table-trade-countdown.countdown-urgent { color: #f85149; font-weight: 600; }
+
+    /* ── Warning de agente duplicado ── */
+    .duplicate-warning-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: 6px;
+      position: relative;
+    }
+    .duplicate-warning-icon { cursor: help; font-size: 1rem; user-select: none; }
+    .duplicate-warning-tooltip {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2d1a00;
+      border: 1px solid #d29922;
+      color: #e3b341;
+      border-radius: 6px;
+      padding: 7px 11px;
+      font-size: 0.75rem;
+      width: 260px;
+      z-index: 9999;
+      line-height: 1.5;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+      pointer-events: none;
+    }
+    .duplicate-warning-wrap:hover .duplicate-warning-tooltip { display: block; }
+    #duplicateWarning { display: none; }
+
+    /* ══════════════════════════════════════════
+       LEFT SIDEBAR — Seção Dev/Testes/Backlog
+       ══════════════════════════════════════════ */
+
+    /* Seção Coin Flip no painel dev */
+    .dev-section {
+      border-bottom: 1px solid var(--border-color);
+      flex-shrink: 0;
+    }
+    .dev-section-hdr {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      cursor: pointer;
+      background: var(--bg-tertiary);
+      user-select: none;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .dev-section-hdr:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .dev-section-body {
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .dev-section-body.collapsed { display: none; }
+
+    /* Agent rows no Dev panel */
+    .dev-agent-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 6px;
+      border-radius: 5px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+    }
+    .dev-agent-name {
+      font-size: 0.73rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .dev-agent-tf {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .dev-coinflip-history {
+      display: flex;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+    .dev-cf-dot {
+      width: 10px; height: 10px;
+      border-radius: 2px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.45rem; font-weight: 700;
+    }
+    .dev-cf-dot.call   { background: rgba(63,185,80,0.3); color: #3fb950; }
+    .dev-cf-dot.put    { background: rgba(248,81,73,0.3); color: #f85149; }
+    .dev-cf-dot.empty  { background: var(--bg-hover); }
+    .dev-btn-flip, .dev-btn-reset {
+      font-size: 0.65rem; font-weight: 600;
+      padding: 3px 7px; border-radius: 4px;
+      border: 1px solid; cursor: pointer;
+      transition: opacity 0.15s;
+      flex-shrink: 0;
+    }
+    .dev-btn-flip  { background: rgba(88,166,255,0.1); color: #58a6ff; border-color: rgba(88,166,255,0.3); }
+    .dev-btn-reset { background: rgba(210,153,34,0.1); color: #d29922; border-color: rgba(210,153,34,0.3); }
+    .dev-btn-flip:hover, .dev-btn-reset:hover { opacity: 0.75; }
+
+    .dev-empty-msg {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 12px;
+    }
+
+    /* Auto test controls */
+    .dev-auto-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .dev-auto-select {
+      flex: 1;
+      min-width: 0;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      font-size: 0.7rem;
+      padding: 4px 7px;
+    }
+    .dev-auto-btn {
+      font-size: 0.65rem; font-weight: 600;
+      padding: 4px 8px; border-radius: 4px;
+      border: 1px solid; cursor: pointer;
+      transition: opacity 0.15s;
+      flex-shrink: 0;
+    }
+    .dev-auto-btn.once   { background: rgba(88,166,255,0.1); color: #58a6ff; border-color: rgba(88,166,255,0.3); }
+    .dev-auto-btn.minute { background: rgba(63,185,80,0.1); color: #3fb950; border-color: rgba(63,185,80,0.3); }
+    .dev-auto-btn.stop   { background: rgba(248,81,73,0.1); color: #f85149; border-color: rgba(248,81,73,0.3); }
+    .dev-auto-btn.active { opacity: 0.6; }
+    .dev-auto-status {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      padding: 2px 0;
+    }
+
+    /* History list */
+    .dev-history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    .dev-history-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+      padding: 4px 6px;
+      border-radius: 4px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+    }
+    .dev-history-time   { font-size: 0.62rem; color: var(--text-muted); flex-shrink: 0; }
+    .dev-history-agent  { font-size: 0.65rem; color: var(--text-secondary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dev-result-badge   { font-size: 0.65rem; font-weight: 700; padding: 1px 5px; border-radius: 8px; flex-shrink: 0; }
+    .dev-result-badge.call { background: rgba(63,185,80,0.15); color: #3fb950; }
+    .dev-result-badge.put  { background: rgba(248,81,73,0.15); color: #f85149; }
+    .dev-history-log    { font-size: 0.6rem; color: var(--text-muted); width: 100%; }
+
+    .dev-clear-btn {
+      font-size: 0.65rem; font-weight: 600;
+      padding: 3px 8px; border-radius: 4px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .dev-clear-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+    /* ══════════════════════════════════════════
+       ROBOT TESTER — Painel no sidebar
+       ══════════════════════════════════════════ */
+    .robot-status-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: var(--bg-primary);
+      border-bottom: 1px solid var(--border-color);
+      flex-shrink: 0;
+    }
+    .robot-status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #484f58;
+      flex-shrink: 0;
+      transition: background 0.3s;
+    }
+    .robot-status-dot.idle    { background: #484f58; }
+    .robot-status-dot.running { background: #d29922; animation: tp-pulse 0.8s infinite; }
+    .robot-status-dot.pass    { background: #3fb950; }
+    .robot-status-dot.fail    { background: #f85149; }
+    .robot-status-text {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      flex: 1;
+    }
+    .robot-progress-bar {
+      height: 3px;
+      background: var(--bg-tertiary);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .robot-progress-fill {
+      height: 100%;
+      background: #58a6ff;
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    .robot-controls {
+      display: flex;
+      gap: 5px;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border-color);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .robot-btn {
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 5px;
+      border: 1px solid;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      flex: 1;
+    }
+    .robot-btn.run-all  { background: rgba(63,185,80,0.1); color: #3fb950; border-color: rgba(63,185,80,0.3); }
+    .robot-btn.run-fast { background: rgba(88,166,255,0.1); color: #58a6ff; border-color: rgba(88,166,255,0.3); }
+    .robot-btn.repair   { background: rgba(248,81,73,0.1); color: #f85149; border-color: rgba(248,81,73,0.3); }
+    .robot-btn.stop     { background: rgba(210,153,34,0.1); color: #d29922; border-color: rgba(210,153,34,0.3); }
+    .robot-btn:hover:not(:disabled) { opacity: 0.75; }
+    .robot-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .robot-report-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .robot-report-item {
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-primary);
+      overflow: hidden;
+    }
+    .robot-report-hdr {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: var(--bg-tertiary);
+      cursor: pointer;
+      user-select: none;
+    }
+    .robot-report-icon { font-size: 0.9rem; flex-shrink: 0; }
+    .robot-report-name {
+      font-size: 0.73rem;
+      font-weight: 600;
+      flex: 1;
+      color: var(--text-primary);
+    }
+    .robot-report-dur { font-size: 0.62rem; color: var(--text-muted); flex-shrink: 0; }
+    .robot-report-body {
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .robot-report-body.collapsed { display: none; }
+    .robot-report-line {
+      display: flex;
+      align-items: flex-start;
+      gap: 5px;
+      font-size: 0.68rem;
+      line-height: 1.5;
+    }
+    .robot-report-line.pass .robot-report-msg { color: #3fb950; }
+    .robot-report-line.fail .robot-report-msg { color: #f85149; }
+    .robot-report-line.warn .robot-report-msg { color: #d29922; }
+    .robot-report-line.info .robot-report-msg { color: var(--text-secondary); }
+    .robot-report-msg { flex: 1; }
+
+    .robot-repair-section {
+      border-top: 1px solid var(--border-color);
+      padding: 8px 10px;
+      background: rgba(248,81,73,0.05);
+    }
+    .robot-repair-title {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #f85149;
+      margin-bottom: 5px;
+    }
+    .robot-repair-items {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .robot-repair-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 6px;
+      border-radius: 4px;
+      background: rgba(248,81,73,0.06);
+      border: 1px solid rgba(248,81,73,0.15);
+    }
+    .robot-repair-desc {
+      font-size: 0.65rem;
+      color: var(--text-secondary);
+      flex: 1;
+    }
+    .robot-repair-btn {
+      font-size: 0.6rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: rgba(248,81,73,0.15);
+      color: #f85149;
+      border: 1px solid rgba(248,81,73,0.3);
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: opacity 0.15s;
+    }
+    .robot-repair-btn:hover { opacity: 0.75; }
+
+    .robot-empty {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 24px 14px;
+    }
+
+    /* ══════════════════════════════════════════
+       UDP (painel de testes/backlog herdado)
+       ══════════════════════════════════════════ */
+    .udp-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 900;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════ APP ROOT — flex container ═══════ -->
+<div class="app-root">
+
+  <!-- ═══════════════════════════════════════════
+       SIDEBAR ESQUERDA — Painel Dev
+       ═══════════════════════════════════════════ -->
+  <aside class="left-dev-sidebar" id="leftDevSidebar">
+    <div class="left-dev-header">
+      <span style="font-size:1.1rem;">🔬</span>
+      <span class="left-dev-header-title">Dev Console</span>
+      <span class="left-dev-badge" id="leftDevBadge" style="display:none;">0</span>
+    </div>
+
+    <!-- Tabs -->
+    <div class="left-dev-tabs">
+      <button class="left-dev-tab active" data-tab="coinflip" onclick="LeftDev.switchTab('coinflip')">🪙 CoinFlip</button>
+      <button class="left-dev-tab" data-tab="tests" onclick="LeftDev.switchTab('tests')">🔬 Testes</button>
+      <button class="left-dev-tab" data-tab="robot" onclick="LeftDev.switchTab('robot')">🤖 Robot</button>
+      <button class="left-dev-tab" data-tab="backlog" onclick="LeftDev.switchTab('backlog')">📋 Backlog</button>
+    </div>
+
+    <!-- ── ABA: COIN FLIP ── -->
+    <div class="left-dev-pane" id="left-pane-coinflip">
+      <!-- Status dos agentes -->
+      <div class="dev-section">
+        <div class="dev-section-hdr" onclick="LeftDev.toggleSection(this)">
+          <span>▼</span> Status dos Agentes
+        </div>
+        <div class="dev-section-body" id="devAgentsList">
+          <div class="dev-empty-msg">Nenhum agente carregado.</div>
+        </div>
+      </div>
+
+      <!-- Testes Manuais -->
+      <div class="dev-section">
+        <div class="dev-section-hdr" onclick="LeftDev.toggleSection(this)">
+          <span>▼</span> Testes Manuais
+        </div>
+        <div class="dev-section-body" id="devManualSection">
+          <div class="dev-empty-msg">Nenhum agente.</div>
+        </div>
+      </div>
+
+      <!-- Auto Test -->
+      <div class="dev-section">
+        <div class="dev-section-hdr" onclick="LeftDev.toggleSection(this)">
+          <span>▼</span> Auto-Teste
+        </div>
+        <div class="dev-section-body">
+          <select id="devAutoAgentSelect" class="dev-auto-select">
+            <option value="all">Todos os agentes</option>
+          </select>
+          <div class="dev-auto-row">
+            <button class="dev-auto-btn once" id="devAutoOnce">▶ Uma vez</button>
+            <button class="dev-auto-btn minute" id="devAutoMinute">🔄 1/min</button>
+            <button class="dev-auto-btn stop" id="devAutoStop">⏹ Stop</button>
+          </div>
+          <div class="dev-auto-status" id="devAutoStatus"></div>
+        </div>
+      </div>
+
+      <!-- Histórico -->
+      <div class="dev-section" style="flex:1; border-bottom:none;">
+        <div class="dev-section-hdr" onclick="LeftDev.toggleSection(this)" style="display:flex; justify-content:space-between;">
+          <span><span>▼</span> Histórico</span>
+          <button class="dev-clear-btn" onclick="window.devPanel?.clearHistory(); event.stopPropagation()">Limpar</button>
+        </div>
+        <div class="dev-section-body">
+          <div class="dev-history-list" id="devHistoryList">
+            <div class="dev-empty-msg">Nenhuma execução ainda.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ABA: TESTES ── -->
+    <div class="left-dev-pane hidden" id="left-pane-tests">
+      <div id="udpTestsBody" class="udp-tests-body">
+        <div class="udp-loading">A carregar testes...</div>
+      </div>
+    </div>
+
+    <!-- ── ABA: ROBOT TESTER ── -->
+    <div class="left-dev-pane hidden" id="left-pane-robot">
+      <!-- Status bar -->
+      <div class="robot-status-bar">
+        <div class="robot-status-dot idle" id="robotStatusDot"></div>
+        <span class="robot-status-text" id="robotStatusText">Robot Tester pronto.</span>
+      </div>
+      <div class="robot-progress-bar">
+        <div class="robot-progress-fill" id="robotProgressFill"></div>
+      </div>
+
+      <!-- Controles -->
+      <div class="robot-controls">
+        <button class="robot-btn run-all" id="robotRunAll" onclick="RobotTester.runAll()">🚀 Full Scan</button>
+        <button class="robot-btn run-fast" id="robotRunFast" onclick="RobotTester.runFast()">⚡ Quick Check</button>
+        <button class="robot-btn repair" id="robotRepair" onclick="RobotTester.repairAll()" disabled>🔧 Repair</button>
+        <button class="robot-btn stop" id="robotStop" onclick="RobotTester.stop()" disabled>⏹ Stop</button>
+      </div>
+
+      <!-- Relatórios -->
+      <div class="robot-report-list" id="robotReportList">
+        <div class="robot-empty">
+          Clique em <strong>Full Scan</strong> ou <strong>Quick Check</strong> para iniciar o diagnóstico.
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ABA: BACKLOG ── -->
+    <div class="left-dev-pane hidden" id="left-pane-backlog">
+      <!-- ── Diagnósticos automáticos do bot ── -->
+      <div id="botDiagnosticsSection" style="display:none;">
+        <div class="bot-diag-header">
+          <span class="bot-diag-title">🤖 Diagnósticos do Bot</span>
+          <span id="botDiagTimestamp" class="bot-diag-ts"></span>
+        </div>
+        <div id="botDiagnosticsList"></div>
+        <div class="bot-diag-divider"></div>
+      </div>
+      <!-- ── Backlog manual ── -->
+      <div class="udp-backlog-toolbar">
+        <span class="udp-backlog-title">Backlog de Dev</span>
+        <span class="left-dev-badge" id="udpBacklogBadge" style="display:none;"></span>
+        <select id="udpBacklogFilter" class="udp-backlog-filter" onchange="DevPanel.renderBacklog()">
+          <option value="open">Abertas</option>
+          <option value="done">Resolvidas</option>
+          <option value="all">Todas</option>
+        </select>
+      </div>
+      <div id="udpBacklogBody" class="udp-backlog-body"></div>
+      <div class="udp-quick-add">
+        <div class="udp-quick-add-title">+ Nova task manual</div>
+        <input  type="text"     id="udpQaTitle"     class="udp-qa-input"    placeholder="Título da task..." />
+        <textarea               id="udpQaBody"      class="udp-qa-textarea" placeholder="Descrição (opcional)..." rows="2"></textarea>
+        <div class="udp-qa-row">
+          <select id="udpQaPriority" class="udp-qa-select">
+            <option value="normal">Normal</option>
+            <option value="critical">🔴 Crítica</option>
+            <option value="low">⬇ Baixa</option>
+          </select>
+          <label class="udp-qa-reg-label">
+            <input type="checkbox" id="udpQaReg" /> 🔄 Regressão
+          </label>
+          <button class="udp-qa-btn" onclick="DevPanel.quickAddTask()">Adicionar</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Toggle button da sidebar -->
+  <button class="left-dev-toggle" id="leftDevToggle" onclick="LeftDev.toggle()" title="Abrir/Fechar Dev Console">›</button>
+
+  <!-- ═══════════════════════════════════════════
+       ÁREA PRINCIPAL
+       ═══════════════════════════════════════════ -->
+  <div class="main-content" id="mainContent">
+
+    <!-- ═════ HEADER ═════ -->
+    <header class="header">
+      <div class="header-brand">
+        <span class="logo-icon">🤖</span>
+        <span>Binary Bot Dashboard</span>
+      </div>
+      <div class="header-actions">
+        <div class="ws-status">
+          <span id="wsDot" class="ws-dot disconnected"></span>
+          <span id="wsText">Conectando...</span>
+        </div>
+        <button class="btn btn-primary" id="btnNewAgent">+ Novo Agente</button>
+      </div>
+    </header>
+
+    <!-- ═════ NAVBAR ═════ -->
+    <nav class="navbar">
+      <a href="/" class="nav-link active">🏠 Dashboard</a>
+      <a href="/benchmark" class="nav-link">🧪 Benchmark</a>
+      <a href="/analytics" class="nav-link">📊 Analytics</a>
+      <button id="panicBtn" class="btn-panic" onclick="panicStop()">🚨 PANIC STOP</button>
+    </nav>
+
+    <!-- ═════ OVERVIEW CARDS ═════ -->
+    <div class="overview-bar">
+      <div class="overview-card">
+        <span class="overview-card-icon">💰</span>
+        <div class="overview-card-info">
+          <div class="overview-card-label">Saldo Demo</div>
+          <div class="overview-card-value" id="overviewBalance">$9,980.00</div>
+        </div>
+      </div>
+      <div class="overview-card">
+        <span class="overview-card-icon">📈</span>
+        <div class="overview-card-info">
+          <div class="overview-card-label">P&L Acumulado</div>
+          <div class="overview-card-value" id="overviewPnl">+$0.00</div>
+        </div>
+      </div>
+      <div class="overview-card">
+        <span class="overview-card-icon">🎯</span>
+        <div class="overview-card-info">
+          <div class="overview-card-label">Win Rate</div>
+          <div class="overview-card-value" id="overviewWinRate">0%</div>
+        </div>
+      </div>
+      <div class="overview-card">
+        <span class="overview-card-icon">⚡</span>
+        <div class="overview-card-info">
+          <div class="overview-card-label">Total Trades</div>
+          <div class="overview-card-value" id="overviewTrades">0</div>
+        </div>
+      </div>
+      <div class="overview-card">
+        <span class="overview-card-icon">🤖</span>
+        <div class="overview-card-info">
+          <div class="overview-card-label">Agentes Ativos</div>
+          <div class="overview-card-value" id="overviewAgents">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════ MAIN CONTENT ═════ -->
+    <main class="dashboard-full">
+
+      <!-- ── 1. Timeline de Entradas ── -->
+      <div class="trades-timeline-panel">
+        <div class="trades-timeline-header">
+          <span class="trades-timeline-title">⚡ Timeline de Entradas — Últimas 6h</span>
+          <div class="trades-timeline-legend">
+            <span><span class="tl-legend-dot win"></span> WIN</span>
+            <span><span class="tl-legend-dot loss"></span> LOSS</span>
+            <span><span class="tl-legend-dot pending"></span> EM CURSO</span>
+          </div>
+        </div>
+        <div class="trades-timeline-track" id="tradesTimelineTrack">
+          <div class="trades-timeline-empty">Aguardando entradas...</div>
+        </div>
+      </div>
+
+      <!-- ── 2. Gráficos Auxiliares ── -->
+      <div class="charts-aux-row">
+        <!-- Win Rate Donut -->
+        <div class="aux-chart-panel">
+          <div class="aux-chart-header">
+            <span class="aux-chart-title">🎯 Win Rate</span>
+            <span class="aux-chart-subtitle" id="wrChartSubtitle">Geral</span>
+          </div>
+          <div class="aux-chart-body">
+            <canvas id="winRateChart" style="max-width:160px;max-height:160px;"></canvas>
+            <div class="donut-center">
+              <div class="donut-center-pct" id="donutWinRate">0%</div>
+              <div class="donut-center-label">win rate</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Trades por Hora -->
+        <div class="aux-chart-panel">
+          <div class="aux-chart-header">
+            <span class="aux-chart-title">📊 Trades por Hora</span>
+            <span class="aux-chart-subtitle">Últimas 12h</span>
+          </div>
+          <div class="aux-chart-body" style="display:block; padding:12px 16px;">
+            <canvas id="tradesPerHourChart" style="width:100%;height:156px;"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 3. P&L Acumulado (compacto) ── -->
+      <div class="pnl-chart-panel">
+        <div class="pnl-chart-header">
+          <span class="pnl-chart-title">📈 P&L Acumulado — Todos os Agentes</span>
+        </div>
+        <div class="pnl-chart-body">
+          <canvas id="pnlChart"></canvas>
+        </div>
+      </div>
+
+      <!-- ── 4. Agents Grid ── -->
+      <div>
+        <div class="section-header" style="margin-bottom: 12px;">
+          <span class="section-title">🤖 Agentes</span>
+        </div>
+        <div class="agents-grid" id="agentsList">
+          <div class="empty-state">
+            <div class="empty-state-icon">⏳</div>
+            <div class="empty-state-title">Carregando agentes...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 5. Últimas Operações ── -->
+      <div class="trades-panel">
+        <div class="section-header">
+          <span class="section-title">⚡ Últimas Operações</span>
+        </div>
+        <div class="trades-table-container">
+          <table class="trades-table">
+            <thead>
+              <tr>
+                <th>Hora</th><th>Agente</th><th>Direção</th>
+                <th>Stake</th><th>Resultado</th><th>Lucro</th>
+              </tr>
+            </thead>
+            <tbody id="recentTradesTbody">
+              <tr>
+                <td colspan="6" class="text-muted" style="text-align:center;padding:24px;">
+                  Aguardando operações...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div><!-- /main-content -->
+</div><!-- /app-root -->
+
+<!-- ═══════════════════════ MODAL ═══════════════════════ -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modalTitle">+ Novo Agente</h2>
+      <button class="modal-close" id="modalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="agentForm" autocomplete="off">
+        <div class="form-group" id="agentIdGroup" style="display:none;">
+          <label class="form-label">ID do Agente <span class="text-muted">(opcional)</span></label>
+          <input type="text" id="agentId" name="agentId" class="form-control"
+            placeholder="auto-gerado se vazio" pattern="[a-z0-9\-]*" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="display:flex;align-items:center;gap:6px;">
+            Nome
+            <span id="duplicateWarning" class="duplicate-warning-wrap">
+              <span class="duplicate-warning-icon">⚠️</span>
+              <span class="duplicate-warning-tooltip">Já existe um agente com o mesmo índice, vela e modelo. Considere usar outro modelo ou excluir o agente existente. O agente será criado em estado <strong>pausado</strong>.</span>
+            </span>
+          </label>
+          <input type="text" id="agentName" name="agentName" class="form-control"
+            placeholder="ex: R75 — 5min (preenchido automaticamente)" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Símbolo
+              <span id="symbolLoadingSpinner" style="font-size:0.7rem;color:var(--text-muted);margin-left:6px;">⏳ Carregando...</span>
+            </label>
+            <select id="agentSymbol" name="agentSymbol" class="form-control">
+              <option value="R_75">Volatility 75 Index</option>
+            </select>
+            <div id="symbolHint" style="font-size:0.7rem;color:var(--text-muted);margin-top:3px;"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Timeframe (min)</label>
+            <select id="agentTimeframe" name="agentTimeframe" class="form-control">
+              <option value="1">1 min</option>
+              <option value="2">2 min</option>
+              <option value="3">3 min</option>
+              <option value="5" selected>5 min</option>
+              <option value="10">10 min</option>
+              <option value="15">15 min</option>
+              <option value="30">30 min</option>
+              <option value="60">1 hora</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Stake ($)</label>
+            <input type="number" id="agentStake" name="agentStake" class="form-control"
+              min="0.50" step="0.50" value="5.00" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Estratégia</label>
+            <select id="agentStrategy" name="agentStrategy" class="form-control">
+              <option value="rsi_ema">RSI + EMA</option>
+              <option value="bb_squeeze">Bollinger Squeeze</option>
+              <option value="stochrsi">StochRSI</option>
+              <option value="ema_pullback">EMA Pullback</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Token API Deriv (opcional)</label>
+          <input type="password" id="agentToken" name="agentToken" class="form-control"
+            placeholder="Deixe vazio para usar token global" />
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary"
+        onclick="document.getElementById('modalOverlay').classList.remove('open')">Cancelar</button>
+      <button type="submit" form="agentForm" class="btn btn-primary">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ CONFIRM ═══════════════════════ -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-dialog">
+    <div class="confirm-title" id="confirmTitle">Confirmar ação</div>
+    <div class="confirm-message" id="confirmMessage">Tem certeza?</div>
+    <div class="confirm-actions">
+      <button class="btn btn-secondary" id="confirmCancel">Cancelar</button>
+      <button class="btn btn-danger" id="confirmOk">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Overlay UDP herdado (sem painel — migrado para sidebar) -->
+<div class="udp-overlay" id="udpOverlay"></div>
+
+<script src="/static/js/storage.js"></script>
+<script type="module" src="/static/js/app.js"></script>
+<script src="/static/js/tests-panel.js"></script>
+
+<script>
+// ─── LeftDev — Controle da sidebar esquerda ──────────────
+const LeftDev = (() => {
+  let _collapsed = false;
+
+  function toggle() {
+    _collapsed = !_collapsed;
+    const sidebar = document.getElementById('leftDevSidebar');
+    const btn = document.getElementById('leftDevToggle');
+    sidebar.classList.toggle('collapsed', _collapsed);
+    btn.classList.toggle('collapsed', _collapsed);
+    btn.textContent = _collapsed ? '‹' : '›';
+    btn.style.right = _collapsed ? '0' : '300px';
+  }
+
+  function switchTab(tab) {
+    // Atualizar botões
+    document.querySelectorAll('.left-dev-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    // Mostrar pane correto
+    document.querySelectorAll('.left-dev-pane').forEach(pane => {
+      pane.classList.toggle('hidden', !pane.id.endsWith(tab));
+    });
+    // Se tab=tests, renderizar painel de testes
+    if (tab === 'tests') {
+      setTimeout(() => {
+        window.DevPanel?.init?.();
+        window.TestsPanel?.render?.();
+      }, 50);
+    }
+    // Se tab=backlog, renderizar backlog
+    if (tab === 'backlog' && window.DevPanel) {
+      setTimeout(() => window.DevPanel.renderBacklog?.(), 50);
+    }
+  }
+
+  function toggleSection(hdr) {
+    const body = hdr.nextElementSibling;
+    if (!body) return;
+    body.classList.toggle('collapsed');
+    const arrow = hdr.querySelector('span');
+    if (arrow) arrow.textContent = body.classList.contains('collapsed') ? '▶' : '▼';
+  }
+
+  return { toggle, switchTab, toggleSection };
+})();
+window.LeftDev = LeftDev;
+
+// ─── Compatibilidade DevPanel (abre sidebar na tab correta) ──
+window.showTestsPanel = () => LeftDev.switchTab('tests');
+window.hideTestsPanel = () => {};
+window.openTestsPanel = () => LeftDev.switchTab('tests');
+window.closeTestsPanel = () => {};
+
+// ─── PANIC STOP ───────────────────────────────────────────
+async function panicStop() {
+  if (!confirm('🚨 PANIC STOP: Parar TODOS os bots imediatamente?')) return;
+  const btn = document.getElementById('panicBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Parando...';
+  try {
+    const res = await fetch('/api/v1/panic', { method: 'POST' });
+    const data = await res.json();
+    alert(`✅ PANIC executado: ${data.stopped} agente(s) parado(s).`);
+    setTimeout(() => location.reload(), 1000);
+  } catch (e) {
+    alert('❌ Erro ao executar PANIC STOP: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🚨 PANIC STOP';
+  }
+}
+window.panicStop = panicStop;
+
+// ─── SYMBOL DROPDOWN LOADER ──────────────────────────────
+let _symbolsCache = null;
+
+async function loadSymbolsIntoDropdown(currentSymbol) {
+  const select = document.getElementById('agentSymbol');
+  const spinner = document.getElementById('symbolLoadingSpinner');
+  const hint = document.getElementById('symbolHint');
+  if (!select) return;
+  if (_symbolsCache) {
+    _populateSymbolSelect(select, _symbolsCache, currentSymbol);
+    if (spinner) spinner.style.display = 'none';
+    return;
+  }
+  try {
+    const res = await fetch('/api/v1/symbols');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    _symbolsCache = data.categories || [];
+    _populateSymbolSelect(select, _symbolsCache, currentSymbol);
+  } catch (e) {
+    console.warn('Não foi possível carregar símbolos da API:', e.message);
+    if (spinner) spinner.textContent = '⚠️ Offline';
+  } finally {
+    if (spinner) spinner.style.display = 'none';
+  }
+}
+
+function _populateSymbolSelect(select, categories, selectedSymbol) {
+  const prev = selectedSymbol || select.value || 'R_75';
+  select.innerHTML = '';
+  for (const cat of categories) {
+    const group = document.createElement('optgroup');
+    group.label = cat.category;
+    for (const s of cat.symbols) {
+      const opt = document.createElement('option');
+      opt.value = s.symbol;
+      opt.textContent = `${s.display_name}`;
+      if (!s.is_open) opt.textContent += ' 🔒';
+      if (s.symbol === prev) opt.selected = true;
+      group.appendChild(opt);
+    }
+    select.appendChild(group);
+  }
+  _updateSymbolHint(select);
+}
+
+function _updateSymbolHint(select) {
+  const hint = document.getElementById('symbolHint');
+  if (!hint || !_symbolsCache) return;
+  const sym = select.value;
+  for (const cat of _symbolsCache) {
+    const found = cat.symbols.find(s => s.symbol === sym);
+    if (found && found.recommended_timeframes) {
+      hint.textContent = `💡 Timeframes recomendados: ${found.recommended_timeframes.map(t => t + 'min').join(', ')}`;
+      return;
+    }
+  }
+  hint.textContent = '';
+}
+
+window.loadSymbolsIntoDropdown = loadSymbolsIntoDropdown;
+
+document.addEventListener('DOMContentLoaded', () => {
+  const select = document.getElementById('agentSymbol');
+  if (select) {
+    select.addEventListener('change', () => {
+      _updateSymbolHint(select);
+      if (typeof window._updateModalNameAndWarning === 'function') {
+        window._updateModalNameAndWarning();
+      }
+    });
+  }
+  const btnNewAgent = document.getElementById('btnNewAgent');
+  if (btnNewAgent) {
+    btnNewAgent.addEventListener('click', () => {
+      const spinner = document.getElementById('symbolLoadingSpinner');
+      if (spinner) spinner.style.display = 'inline';
+      loadSymbolsIntoDropdown(null).then?.(() => {
+        if (typeof window._updateModalNameAndWarning === 'function') {
+          window._updateModalNameAndWarning();
+        }
+      });
+    });
+  }
+});
+</script>
+
+<!-- ══════════════════ ROBOT TESTER ══════════════════ -->
+<script>
+/**
+ * RobotTester — robô de diagnóstico automático
+ * Testa funcionalidades, analisa componentes visuais e gera relatório.
+ * Pode sugerir e executar reparos.
+ */
+const RobotTester = (() => {
+  let _running = false;
+  let _shouldStop = false;
+  let _repairQueue = []; // { id, desc, fix: async fn }
+
+  // ── Utilitários ──────────────────────────────────────
+  function _setStatus(type, msg) {
+    const dot = document.getElementById('robotStatusDot');
+    const txt = document.getElementById('robotStatusText');
+    if (dot) dot.className = `robot-status-dot ${type}`;
+    if (txt) txt.textContent = msg;
+  }
+
+  function _setProgress(pct) {
+    const bar = document.getElementById('robotProgressFill');
+    if (bar) bar.style.width = `${Math.min(100, pct)}%`;
+  }
+
+  function _setButtons(running) {
+    const runAll  = document.getElementById('robotRunAll');
+    const runFast = document.getElementById('robotRunFast');
+    const repair  = document.getElementById('robotRepair');
+    const stop    = document.getElementById('robotStop');
+    if (runAll)  runAll.disabled  = running;
+    if (runFast) runFast.disabled = running;
+    if (stop)    stop.disabled    = !running;
+    if (repair)  repair.disabled  = running || _repairQueue.length === 0;
+  }
+
+  // ── Renderização de relatórios ───────────────────────
+  function _clearReports() {
+    const list = document.getElementById('robotReportList');
+    if (list) list.innerHTML = '';
+    _repairQueue = [];
+  }
+
+  function _addReport(icon, name, lines, repairs = []) {
+    const list = document.getElementById('robotReportList');
+    if (!list) return;
+
+    const hasFailure = lines.some(l => l.type === 'fail');
+    const id = `robot-rpt-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    const item = document.createElement('div');
+    item.className = 'robot-report-item';
+    item.innerHTML = `
+      <div class="robot-report-hdr" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+        <span class="robot-report-icon">${icon}</span>
+        <span class="robot-report-name">${name}</span>
+      </div>
+      <div class="robot-report-body">
+        ${lines.map(l => `
+          <div class="robot-report-line ${l.type}">
+            <span>${l.type === 'pass' ? '✅' : l.type === 'fail' ? '❌' : l.type === 'warn' ? '⚠️' : 'ℹ️'}</span>
+            <span class="robot-report-msg">${l.msg}</span>
+          </div>`).join('')}
+        ${repairs.length > 0 ? `
+          <div class="robot-repair-section">
+            <div class="robot-repair-title">🔧 Reparos Disponíveis</div>
+            <div class="robot-repair-items">
+              ${repairs.map((r, i) => `
+                <div class="robot-repair-item">
+                  <span class="robot-repair-desc">${r.desc}</span>
+                  <button class="robot-repair-btn" onclick="RobotTester._execRepair('${id}',${i})">Reparar</button>
+                </div>`).join('')}
+            </div>
+          </div>` : ''}
+      </div>`;
+    list.appendChild(item);
+
+    // Registrar reparos
+    repairs.forEach((r, i) => {
+      _repairQueue.push({ id: `${id}-${i}`, desc: r.desc, fix: r.fix });
+    });
+
+    // Mostrar botão repair se houver itens
+    const repairBtn = document.getElementById('robotRepair');
+    if (repairBtn && _repairQueue.length > 0) repairBtn.disabled = false;
+  }
+
+  // ── Execução de reparo individual ────────────────────
+  window.RobotTester = window.RobotTester || {};
+  async function _execRepair(reportId, repairIdx) {
+    const key = `${reportId}-${repairIdx}`;
+    const entry = _repairQueue.find(r => r.id === key);
+    if (!entry) {
+      window.showToast?.('❌ Erro', 'Reparo não encontrado.', 'error');
+      return;
+    }
+    try {
+      _setStatus('running', `🔧 Executando reparo: ${entry.desc}`);
+      await entry.fix();
+      window.showToast?.('✅ Reparo', entry.desc, 'success');
+      _setStatus('pass', 'Reparo concluído.');
+    } catch (e) {
+      window.showToast?.('❌ Falha no Reparo', e.message, 'error');
+      _setStatus('fail', `Reparo falhou: ${e.message}`);
+    }
+  }
+
+  // ── Suites de testes ─────────────────────────────────
+  const SUITES = [
+    {
+      id: 'api-health',
+      name: '🌐 API Health',
+      fast: true,
+      run: async () => {
+        const lines = [];
+        const repairs = [];
+
+        // Test /api/v1/agents
+        try {
+          const r = await fetch('/api/v1/agents');
+          if (r.ok) {
+            const d = await r.json();
+            lines.push({ type: 'pass', msg: `/api/v1/agents → OK (${(d.agents || d).length ?? '?'} agentes)` });
+          } else {
+            lines.push({ type: 'fail', msg: `/api/v1/agents → HTTP ${r.status}` });
+          }
+        } catch (e) {
+          lines.push({ type: 'fail', msg: `/api/v1/agents → ${e.message}` });
+        }
+
+        // Test /api/v1/trades
+        try {
+          const r = await fetch('/api/v1/trades?limit=5');
+          if (r.ok) {
+            lines.push({ type: 'pass', msg: `/api/v1/trades → OK` });
+          } else {
+            lines.push({ type: 'fail', msg: `/api/v1/trades → HTTP ${r.status}` });
+          }
+        } catch (e) {
+          lines.push({ type: 'fail', msg: `/api/v1/trades → ${e.message}` });
+        }
+
+        // Test /api/v1/symbols
+        try {
+          const r = await fetch('/api/v1/symbols');
+          if (r.ok) {
+            lines.push({ type: 'pass', msg: `/api/v1/symbols → OK` });
+          } else {
+            lines.push({ type: 'fail', msg: `/api/v1/symbols → HTTP ${r.status}` });
+          }
+        } catch (e) {
+          lines.push({ type: 'fail', msg: `/api/v1/symbols → ${e.message}` });
+        }
+
+        return { icon: '🌐', name: 'API Health', lines, repairs };
+      }
+    },
+    {
+      id: 'ws-check',
+      name: '⚙️ WebSocket',
+      fast: true,
+      run: async () => {
+        const lines = [];
+        const repairs = [];
+        try {
+          const msg = await new Promise((resolve, reject) => {
+            const ws = new WebSocket(`ws://${location.host}/ws`);
+            const t = setTimeout(() => reject(new Error('Timeout 5s')), 5000);
+            ws.onmessage = (e) => {
+              const d = JSON.parse(e.data);
+              if (d.type === 'full_state') { clearTimeout(t); ws.close(); resolve(d); }
+            };
+            ws.onerror = () => reject(new Error('WebSocket erro'));
+          });
+          lines.push({ type: 'pass', msg: `Conectado. ${msg.agents?.length ?? 0} agentes recebidos.` });
+        } catch (e) {
+          lines.push({ type: 'fail', msg: `Falha: ${e.message}` });
+          repairs.push({
+            desc: 'Recarregar página para reconectar WebSocket',
+            fix: async () => location.reload()
+          });
+        }
+        return { icon: '⚙️', name: 'WebSocket', lines, repairs };
+      }
+    },
+    {
+      id: 'ui-elements',
+      name: '🖼 Componentes Visuais',
+      fast: false,
+      run: async () => {
+        const lines = [];
+        const repairs = [];
+        const checks = [
+          { id: 'pnlChart',              label: 'Canvas P&L Chart' },
+          { id: 'winRateChart',          label: 'Canvas Win Rate' },
+          { id: 'tradesPerHourChart',    label: 'Canvas Trades/Hora' },
+          { id: 'tradesTimelineTrack',   label: 'Timeline de trades' },
+          { id: 'agentsList',            label: 'Grid de Agentes' },
+          { id: 'recentTradesTbody',     label: 'Tabela de Trades' },
+          { id: 'overviewBalance',       label: 'Card Saldo' },
+          { id: 'overviewPnl',           label: 'Card P&L' },
+          { id: 'overviewWinRate',       label: 'Card Win Rate' },
+          { id: 'wsDot',                 label: 'Indicador WS' },
+          { id: 'robotReportList',       label: 'Robot Report List' },
+          { id: 'leftDevSidebar',        label: 'Sidebar Dev' },
+        ];
+        checks.forEach(c => {
+          const el = document.getElementById(c.id);
+          if (el) {
+            const visible = el.offsetWidth > 0 || el.offsetHeight > 0;
+            lines.push({
+              type: visible ? 'pass' : 'warn',
+              msg: `${c.label} — ${visible ? 'visível' : 'presente mas não visível'}`
+            });
+          } else {
+            lines.push({ type: 'fail', msg: `${c.label} — elemento #${c.id} não encontrado` });
+          }
+        });
+
+        // Checar se há agentes
+        const agentCards = document.querySelectorAll('.agent-card');
+        if (agentCards.length === 0) {
+          lines.push({ type: 'warn', msg: 'Nenhum card de agente renderizado' });
+        } else {
+          lines.push({ type: 'pass', msg: `${agentCards.length} card(s) de agente visíveis` });
+        }
+
+        // Checar gráficos Chart.js
+        if (window.Chart && Chart.instances) {
+          const chartCount = Object.keys(Chart.instances).length;
+          lines.push({
+            type: chartCount > 0 ? 'pass' : 'warn',
+            msg: `${chartCount} instância(s) Chart.js ativa(s)`
+          });
+        }
+
+        return { icon: '🖼', name: 'Componentes Visuais', lines, repairs };
+      }
+    },
+    {
+      id: 'perf-check',
+      name: '⚡ Performance',
+      fast: false,
+      run: async () => {
+        const lines = [];
+        const repairs = [];
+
+        // Medir fetch da API
+        const start = performance.now();
+        try {
+          await fetch('/api/v1/agents');
+          const ms = Math.round(performance.now() - start);
+          const type = ms < 200 ? 'pass' : ms < 500 ? 'warn' : 'fail';
+          lines.push({ type, msg: `Latência /api/v1/agents: ${ms}ms` });
+          if (type === 'fail') {
+            lines.push({ type: 'warn', msg: 'API lenta — verifique a carga do servidor' });
+          }
+        } catch (e) {
+          lines.push({ type: 'fail', msg: `Erro ao medir latência: ${e.message}` });
+        }
+
+        // Contar elementos DOM
+        const allEls = document.querySelectorAll('*').length;
+        lines.push({
+          type: allEls < 2000 ? 'pass' : allEls < 5000 ? 'warn' : 'fail',
+          msg: `Total de elementos DOM: ${allEls}`
+        });
+
+        // LocalStorage usage
+        try {
+          let lsSize = 0;
+          for (let k in localStorage) { lsSize += (localStorage[k]||'').length; }
+          lines.push({
+            type: lsSize < 50000 ? 'pass' : 'warn',
+            msg: `LocalStorage: ${(lsSize/1024).toFixed(1)}KB`
+          });
+        } catch(e) {
+          lines.push({ type: 'info', msg: 'LocalStorage não disponível' });
+        }
+
+        return { icon: '⚡', name: 'Performance', lines, repairs };
+      }
+    },
+    {
+      id: 'data-integrity',
+      name: '🗄 Integridade de Dados',
+      fast: false,
+      run: async () => {
+        const lines = [];
+        const repairs = [];
+
+        try {
+          const resp = await fetch('/api/v1/trades?limit=20');
+          if (resp.ok) {
+            const data = await resp.json();
+            const trades = data.trades || [];
+            const pending = trades.filter(t => t.result === 'pending');
+            const won = trades.filter(t => t.result === 'won');
+            const lost = trades.filter(t => t.result === 'lost');
+            lines.push({ type: 'pass', msg: `${trades.length} trades: ${won.length}W / ${lost.length}L / ${pending.length} em curso` });
+
+            // Verificar trades sem agent_id
+            const orphan = trades.filter(t => !t.agent_id);
+            if (orphan.length > 0) {
+              lines.push({ type: 'warn', msg: `${orphan.length} trade(s) sem agent_id` });
+            } else {
+              lines.push({ type: 'pass', msg: 'Todos os trades têm agent_id' });
+            }
+
+            // Verificar lucros inconsistentes
+            const negativeWon = won.filter(t => t.profit < 0);
+            const positiveLoose = lost.filter(t => t.profit > 0);
+            if (negativeWon.length > 0) {
+              lines.push({ type: 'warn', msg: `${negativeWon.length} trade(s) 'won' com lucro negativo` });
+            }
+            if (positiveLoose.length > 0) {
+              lines.push({ type: 'warn', msg: `${positiveLoose.length} trade(s) 'lost' com lucro positivo` });
+            }
+            if (negativeWon.length === 0 && positiveLoose.length === 0) {
+              lines.push({ type: 'pass', msg: 'Consistência de resultado/lucro: OK' });
+            }
+          } else {
+            lines.push({ type: 'fail', msg: `Falha ao buscar trades: HTTP ${resp.status}` });
+          }
+        } catch (e) {
+          lines.push({ type: 'fail', msg: `Erro: ${e.message}` });
+        }
+
+        return { icon: '🗄', name: 'Integridade de Dados', lines, repairs };
+      }
+    }
+  ];
+
+  // ── Runner principal ──────────────────────────────────
+  async function _run(fast) {
+    if (_running) return;
+    _running = true;
+    _shouldStop = false;
+    _clearReports();
+    _setButtons(true);
+    _setStatus('running', 'Iniciando diagnóstico...');
+    _setProgress(0);
+
+    const suites = fast ? SUITES.filter(s => s.fast) : SUITES;
+    let done = 0;
+
+    for (const suite of suites) {
+      if (_shouldStop) break;
+      _setStatus('running', `Testando: ${suite.name}...`);
+      try {
+        const result = await suite.run();
+        _addReport(result.icon, result.name, result.lines, result.repairs || []);
+      } catch (e) {
+        _addReport('❌', suite.name, [{ type: 'fail', msg: `Erro inesperado: ${e.message}` }]);
+      }
+      done++;
+      _setProgress((done / suites.length) * 100);
+      await new Promise(r => setTimeout(r, 100)); // pequena pausa entre suites
+    }
+
+    const hasFailures = document.querySelectorAll('.robot-report-line.fail').length > 0;
+    _setStatus(hasFailures ? 'fail' : 'pass',
+      hasFailures ? '❌ Diagnóstico concluído com falhas.' : '✅ Tudo OK!');
+    _setProgress(100);
+    _running = false;
+    _shouldStop = false;
+    _setButtons(false);
+  }
+
+  async function runAll()  { await _run(false); }
+  async function runFast() { await _run(true);  }
+
+  function stop() {
+    _shouldStop = true;
+    _setStatus('idle', 'Parando...');
+  }
+
+  async function repairAll() {
+    if (_repairQueue.length === 0) {
+      window.showToast?.('ℹ️ Sem Reparos', 'Nenhum reparo pendente.', 'info');
+      return;
+    }
+    _setStatus('running', `Executando ${_repairQueue.length} reparo(s)...`);
+    let ok = 0, fail = 0;
+    for (const entry of [..._repairQueue]) {
+      try {
+        await entry.fix();
+        ok++;
+      } catch(e) {
+        fail++;
+        console.error(`Reparo ${entry.desc} falhou:`, e);
+      }
+    }
+    _repairQueue = [];
+    _setStatus(fail === 0 ? 'pass' : 'warn',
+      `${ok} reparo(s) OK${fail > 0 ? `, ${fail} falhou` : ''}.`);
+    window.showToast?.('🔧 Reparos', `${ok} OK / ${fail} falhou`, fail === 0 ? 'success' : 'warning');
+  }
+
+  return { runAll, runFast, stop, repairAll, _execRepair };
+})();
+
+window.RobotTester = RobotTester;
+</script>
+
+</body>
+</html>
